@@ -68,12 +68,15 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
+
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           disableTransitionOnChange
           enableSystem
         >
+      <h1>AI</h1>
+
           <SessionProvider
             basePath={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/auth`}
           >
