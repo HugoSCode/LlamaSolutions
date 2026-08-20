@@ -1,42 +1,243 @@
-# sv
+### Stack
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
-
-## Creating a project
-
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
+```text
+Frontend: Next.js / Vercel Chatbot
+DB ORM:   Drizzle
+Database: PostgreSQL (Neon)
+Auth:     Auth.js
+AI:       LM Studio (future)
 ```
 
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.17.0 create --template minimal --types ts --install npm web-ui
+```
 ```
 
-## Developing
+# Local Development Setup — Vercel Chatbot + Neon
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+This project uses the **Vercel Chatbot** template as the frontend/application framework. The long-term goal is to connect it to a self-hosted LLM through **LM Studio**.
 
-```sh
-npm run dev
+For now, this guide covers getting the chatbot running locally and connecting its PostgreSQL database through **Neon**.
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+---
+
+## 1. Prerequisites
+
+You should have:
+
+- Node.js installed
+- pnpm installed
+- A Neon account
+
+## 2. Use pnpm, Not npm
+
+The Vercel Chatbot project uses pnpm.
+
+From the project directory:
+
+```powershell
+pnpm install
+```
+Then:
+
+```powershell
+pnpm install
 ```
 
-## Building
+### Windows Corepack issue
 
-To create a production version of your app:
-
-```sh
-npm run build
+```from powershell as administrator
+corepack enable
+```
+```
+corepack prepare pnpm@10.32.1 --activate
 ```
 
-You can preview the production build with `npm run preview`.
+## 3. Environment Variables
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Create:
+
+```text
+.env.local
+```
+
+You should be able to just copy the .env.example file but here's info about each field
+
+in the root of the project:
+
+```text
+D:\LlamaSolutions\chatbot\.env.local
+```
+
+The file should contain:
+
+```env
+# Auth.js
+AUTH_SECRET=YOUR_RANDOM_SECRET
+
+# PostgreSQL / Neon
+POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING
+
+# Vercel AI Gateway
+# Not needed while replacing the AI backend with LM Studio
+AI_GATEWAY_API_KEY=
+
+# Vercel Blob
+# Only required if using Blob functionality
+BLOB_READ_WRITE_TOKEN=
+
+# Redis
+# Only required if using Redis functionality
+REDIS_URL=
+```
+
+### AUTH_SECRET
+
+Generate a random secret.
+
+Click the link provided to generate a secret and paste it in
+
+# 4. PostgreSQL: Use Neon
+
+For this project, **Neon is the best balance of ease and long-term scalability**.
+---
+# 6. Get the Neon Connection String
+
+In the Neon dashboard, click **Connect**.
+
+Copy the PostgreSQL connection string:
+
+Example:
+
+```text
+postgresql://username:password@ep-example-123456.region.aws.neon.tech/neondb?sslmode=require
+```
+
+Do not share this publicly.
+
+Add it to `.env.local`:
+
+```env
+POSTGRES_URL=postgresql://username:password@ep-example-123456.region.aws.neon.tech/neondb?sslmode=require
+```
+
+❌ Do NOT use local Postgres unless intentionally running it:
+
+```env
+POSTGRES_URL=postgresql://localhost:5432/database
+```
+
+---
+
+# 7.Database Migrations
+
+The chatbot requires database tables before it can function.
+
+Run:
+
+```powershell
+pnpm db:migrate
+```
+
+It will create the required schema in Neon.
+
+A successful run completes without connection errors.
+
+---
+
+# 8. Start the Development Server
+
+After setup:
+
+```powershell
+pnpm dev
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+---
+
+# 9. Current Architecture
+
+```text
+┌──────────────────────────┐
+│      Web Browser         │
+└────────────┬─────────────┘
+             │
+             v
+┌──────────────────────────┐
+│ Vercel Chatbot / Next.js │
+└────────────┬─────────────┘
+             │
+       ┌─────┴─────┐
+       │           │
+       v           v
+    Auth.js     Drizzle
+                   │
+                   v
+              PostgreSQL
+                   │
+                   v
+                  Neon
+```
+
+---
+
+# 10. LM Studio (Future Step)
+
+Later, the AI backend will be replaced with **LM Studio**.
+
+```text
+┌──────────────────────────┐
+│      Web Browser         │
+└────────────┬─────────────┘
+             │
+             v
+┌──────────────────────────┐
+│ Vercel Chatbot / Next.js │
+└────────────┬─────────────┘
+             │
+       ┌─────┴──────┐
+       │            │
+       v            v
+    Drizzle      AI SDK
+       │            │
+       v            v
+     Neon       LM Studio
+                Local LLM
+```
+
+
+---
+
+# Quick Reference
+
+### Start project
+
+```powershell
+cd D:\LlamaSolutions\chatbot
+pnpm install
+pnpm dev
+```
+
+### Migrate database
+
+```powershell
+pnpm db:migrate
+```
+
+### Environment file
+
+```env
+AUTH_SECRET=YOUR_RANDOM_SECRET
+POSTGRES_URL=YOUR_NEON_CONNECTION_STRING
+
+AI_GATEWAY_API_KEY=
+BLOB_READ_WRITE_TOKEN=
+REDIS_URL=
+```
+
+
+
