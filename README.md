@@ -87,6 +87,10 @@ BLOB_READ_WRITE_TOKEN=
 # Redis
 # Only required if using Redis functionality
 REDIS_URL=
+
+LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1
+LMSTUDIO_API_KEY="Anything"    //Models don't need a key by default on lmstudio
+LMSTUDIO_MODEL="smollm2-135m-instruct"  //Change this to the id of locally running model
 ```
 
 ### AUTH_SECRET
