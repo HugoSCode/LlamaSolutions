@@ -25,6 +25,7 @@ function PureChatHeader({
 
   return (
     <header className="sticky top-0 flex h-14 items-center gap-2 bg-sidebar px-3">
+          <h1 className="text-white text-2xl font-bold">🦙LLAMA solutions</h1>
       <Button
         className="md:hidden"
         onClick={toggleSidebar}
