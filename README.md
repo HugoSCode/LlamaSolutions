@@ -71,7 +71,7 @@ The file should contain:
 
 ```env
 # Auth.js
-AUTH_SECRET=YOUR_RANDOM_SECRET link to generate: https://generate-secret.vercel.app/32?utm_source=chatgpt.com
+AUTH_SECRET=YOUR_RANDOM_SECRET link to generate: https://generate-secret.vercel.app/32
 
 # PostgreSQL / Neon
 POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING
