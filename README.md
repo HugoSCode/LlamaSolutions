@@ -71,10 +71,10 @@ The file should contain:
 
 ```env
 # Auth.js
-AUTH_SECRET=YOUR_RANDOM_SECRET link to generate: https://generate-secret.vercel.app/32
+AUTH_SECRET=YOUR_RANDOM_SECRET # link to generate: https://generate-secret.vercel.app/32
 
 # PostgreSQL / Neon
-POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING
+POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING  # Find it here: https://console.neon.tech/app/projects/solitary-dust-07252132 | Click on llamasolutions project (recent one) and click connect
 
 # Vercel AI Gateway
 # Not needed while replacing the AI backend with LM Studio
