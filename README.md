@@ -138,7 +138,7 @@ POSTGRES_URL=postgresql://localhost:5432/database
 - Ensure Server status is running
 **In .env.local:**
 - LMSTUDIO_MODEL (This example is using: smollm2-135m-instruct)
-- LMSTUDIO_BASE_URL: http://127.0.0.1:1234(local model) or http://10.118.0.111:1234 (Remote server model)- currently only works when on the Otago polytechnic network
+- LMSTUDIO_BASE_URL: http://127.0.0.1:1234 (local model) or http://10.118.0.111:1234 (Remote server model)- currently only works when on the Otago polytechnic network
 
 # 7.Database Migrations
 
