@@ -3,8 +3,26 @@ import { createClient } from "redis";
 import { isProductionEnvironment } from "@/lib/constants";
 import { ChatbotError } from "@/lib/errors";
 
-const MAX_MESSAGES = 10;
+// Controls the maximum number of chat requests allowed per IP within a one-hour window.
+// Development allows a higher limit for testing, while production uses a lower limit
+// to help prevent abuse and excessive API/model usage.
+const RATE_LIMITS = {
+  dev: {
+    maxMessagesPerHour: 1000,
+  },
+  prod: {
+    maxMessagesPerHour: 100,
+  },
+} as const;
+
+const environment =
+  process.env.APP_ENV === "prod" ? "prod" : "dev";
+
+const MAX_MESSAGES =
+  RATE_LIMITS[environment].maxMessagesPerHour;
+
 const TTL_SECONDS = 60 * 60;
+
 
 let client: ReturnType<typeof createClient> | null = null;
 
@@ -20,6 +38,7 @@ function getClient() {
 }
 
 export async function checkIpRateLimit(ip: string | undefined) {
+  console.log(ip)
   if (!isProductionEnvironment || !ip) {
     return;
   }
@@ -36,7 +55,7 @@ export async function checkIpRateLimit(ip: string | undefined) {
       .incr(key)
       .expire(key, TTL_SECONDS, "NX")
       .exec();
-
+    console.log("COUNT:", count)
     if (typeof count === "number" && count > MAX_MESSAGES) {
       throw new ChatbotError("rate_limit:chat");
     }

@@ -11,7 +11,7 @@ AI:       LM Studio (future)
 ```
 ```
 
-# Local Development Setup — Vercel Chatbot + Neon
+# Local Development Setup — Vercel Chatbot + Neon + LMStudio
 
 This project uses the **Vercel Chatbot** template as the frontend/application framework. The long-term goal is to connect it to a self-hosted LLM through **LM Studio**.
 
@@ -71,10 +71,10 @@ The file should contain:
 
 ```env
 # Auth.js
-AUTH_SECRET=YOUR_RANDOM_SECRET
+AUTH_SECRET=YOUR_RANDOM_SECRET # link to generate: https://generate-secret.vercel.app/32
 
 # PostgreSQL / Neon
-POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING
+POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING  # Find it here: https://console.neon.tech/app/projects/solitary-dust-07252132 | Click on llamasolutions project (recent one) and click connect
 
 # Vercel AI Gateway
 # Not needed while replacing the AI backend with LM Studio
@@ -87,6 +87,10 @@ BLOB_READ_WRITE_TOKEN=
 # Redis
 # Only required if using Redis functionality
 REDIS_URL=
+
+LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1
+LMSTUDIO_API_KEY="Anything"    //Models don't need a key by default on lmstudio
+LMSTUDIO_MODEL="smollm2-135m-instruct"  //Change this to the id of locally running model
 ```
 
 ### AUTH_SECRET
@@ -111,6 +115,7 @@ Example:
 postgresql://username:password@ep-example-123456.region.aws.neon.tech/neondb?sslmode=require
 ```
 
+
 Do not share this publicly.
 
 Add it to `.env.local`:
@@ -126,6 +131,14 @@ POSTGRES_URL=postgresql://localhost:5432/database
 ```
 
 ---
+
+# LMStudio setup
+<img width="2384" height="602" alt="image" src="https://github.com/user-attachments/assets/3c1ae4b5-efdb-4b2f-a0a3-7b562794c3be" />
+
+- Ensure Server status is running
+**In .env.local:**
+- LMSTUDIO_MODEL (This example is using: smollm2-135m-instruct)
+- LMSTUDIO_BASE_URL: http://127.0.0.1:1234 (local model) or http://10.118.0.111:1234 (Remote server model)- currently only works when on the Otago polytechnic network
 
 # 7.Database Migrations
 
