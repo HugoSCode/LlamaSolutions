@@ -11,7 +11,7 @@ AI:       LM Studio (future)
 ```
 ```
 
-# Local Development Setup — Vercel Chatbot + Neon
+# Local Development Setup — Vercel Chatbot + Neon + LMStudio
 
 This project uses the **Vercel Chatbot** template as the frontend/application framework. The long-term goal is to connect it to a self-hosted LLM through **LM Studio**.
 
@@ -115,6 +115,7 @@ Example:
 postgresql://username:password@ep-example-123456.region.aws.neon.tech/neondb?sslmode=require
 ```
 
+
 Do not share this publicly.
 
 Add it to `.env.local`:
@@ -130,6 +131,14 @@ POSTGRES_URL=postgresql://localhost:5432/database
 ```
 
 ---
+
+# LMStudio setup
+<img width="2384" height="602" alt="image" src="https://github.com/user-attachments/assets/3c1ae4b5-efdb-4b2f-a0a3-7b562794c3be" />
+
+- Ensure Server status is running
+**In .env.local:**
+- LMSTUDIO_MODEL (This example is using: smollm2-135m-instruct)
+- LMSTUDIO_BASE_URL: http://127.0.0.1:1234(local model) or http://10.118.0.111:1234 (Remote server model)- currently only works when on the Otago polytechnic network
 
 # 7.Database Migrations
 
