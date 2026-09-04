@@ -225,6 +225,14 @@ Later, the AI backend will be replaced with **LM Studio**.
 
 ---
 
+# Cloudflare tunnel visualisation
+
+- This is how the architecture will look like for Cloudflare to allow us to remotely reach our model
+
+<img width="1536" height="1024" alt="cloudflareTunnel" src="https://github.com/user-attachments/assets/94cc57b5-b407-47bc-9c69-4c137512393f" />
+
+
+
 # Quick Reference
 
 ### Start project
