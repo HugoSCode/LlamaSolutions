@@ -12,7 +12,7 @@ const LMSTUDIO_BASE_URL ="http://10.118.0.111:1234/v1"
 export async function getLMStudioModels(): Promise<ChatModel[]> {
   const response = await fetch(`${LMSTUDIO_BASE_URL}/models`);
   if (!response.ok) {
-    throw new Error(`LM Studio returned ${response.status}`);
+    throw new Error(`LM Studio returned ${response}`);
   }
 
   const data = await response.json();
@@ -41,14 +41,8 @@ export type ChatModel = {
   reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
 };
  
-export const chatModels: ChatModel[] = [
-  {
-    description: "Local Qwen3 VL 4B model with vision and tool use",
-    id: "qwen/qwen3-vl-4b",
-    name: "Qwen3 VL 4B",
-    provider: "lmstudio",
-  },
-];
+export const chatModels: ChatModel[] = await getLMStudioModels();
+
  
 export const isDemo = process.env.IS_DEMO === "5";
  
