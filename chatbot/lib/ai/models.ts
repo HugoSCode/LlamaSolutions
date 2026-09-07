@@ -6,6 +6,25 @@ export const titleModel = {
   name: "Qwen3 VL 4B",
   provider: "lmstudio",
 };
+
+const LMSTUDIO_BASE_URL ="http://10.118.0.111:1234/v1"
+
+export async function getLMStudioModels(): Promise<ChatModel[]> {
+  const response = await fetch(`${LMSTUDIO_BASE_URL}/models`);
+  if (!response.ok) {
+    throw new Error(`LM Studio returned ${response.status}`);
+  }
+
+  const data = await response.json();
+  console.log(data)
+  return data.data.map((model: any) => ({
+    id: model.id,
+    name: model.id,
+    provider: "lmstudio",
+    description: `Local LM Studio model: ${model.id}`,
+  }));
+}
+console.log(getLMStudioModels());
  
 export type ModelCapabilities = {
   tools: boolean;
