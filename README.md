@@ -1,269 +1,140 @@
-### Stack
+# LlamaSolutions
 
-```text
-Frontend: Next.js / Vercel Chatbot
-DB ORM:   Drizzle
-Database: PostgreSQL (Neon)
-Auth:     Auth.js
-AI:       LM Studio (future)
-```
+A team chatbot for class and lab use. It is a **Next.js** app based on the [Vercel AI Chatbot](https://github.com/vercel/ai-chatbot) template, with **Neon** (Postgres) + **Auth.js** for cloud-saved chats, and **LM Studio** for local / school-hosted models.
 
-```
-```
+This GitHub page is **only the source code**. Opening the repository in a browser is **not** the app. You must run it locally (usually on campus Wi‑Fi) so your machine can reach the school LM Studio server.
 
-# Local Development Setup — Vercel Chatbot + Neon + LMStudio
-
-This project uses the **Vercel Chatbot** template as the frontend/application framework. The long-term goal is to connect it to a self-hosted LLM through **LM Studio**.
-
-For now, this guide covers getting the chatbot running locally and connecting its PostgreSQL database through **Neon**.
+| App (after you start it) | Not the app |
+| --- | --- |
+| [http://localhost:3000](http://localhost:3000) | This GitHub README / repo page |
 
 ---
 
-## 1. Prerequisites
+## What is on `main` now
 
-You should have:
+After you sign in, you get:
 
-- Node.js installed
-- pnpm installed
-- A Neon account
+- **Voice in / out** — microphone dictation into the composer, and speak-back of the latest assistant reply
+- **Model picker + connection status** — header shows the current model and a **green** / **red** status dot
+- **Export** — download the current chat as Markdown (`.md`) or JSON (`.json`)
+- **Sidebar** — **New chat**, rename a chat (`…` → **Rename**), **Delete All Chats**
+- **Local incognito vs Cloud sync** — header toggle
+  - **Cloud sync** (default): chats are written to Neon
+  - **Local incognito**: chats stay in this browser (IndexedDB); the server still talks to LM Studio but **skips Neon writes**
 
-## 2. Use pnpm, Not npm
+---
 
-The Vercel Chatbot project uses pnpm.
+## Run from zero (school lab PC)
 
-From the project directory:
+Windows + VS Code is fine. Commands below use PowerShell or Command Prompt.
 
-```powershell
-pnpm install
+### 1. Clone and open the app folder
+
+```bash
+git clone https://github.com/siqiwang-53/LlamaSolutions.git
+cd LlamaSolutions/chatbot
 ```
-Then:
 
-```powershell
-pnpm install
+The Next.js app lives in **`chatbot/`**, not the repo root.
+
+### 2. Environment file (no secrets in this README)
+
+```bash
+copy .env.example .env.local
 ```
 
-### Windows Corepack issue
+On macOS / Linux:
 
-```from powershell as administrator
+```bash
+cp .env.example .env.local
+```
+
+`.env.example` already documents the Neon, Auth.js, and LM Studio variables. **Do not commit `.env.local`.** Do not paste real passwords or connection strings into Slack, email, or this README.
+
+If you already have a teammate’s working `.env.local`, copy that file locally instead of inventing values.
+
+### 3. Point LM Studio at the right host
+
+| Where you are | `LMSTUDIO_BASE_URL` | Notes |
+| --- | --- | --- |
+| **School / campus Wi‑Fi** | `http://10.118.0.111:1234/v1` | Shared lab server. **Do not** use `127.0.0.1` unless **you** started LM Studio on **this** PC. |
+| **Home** | `http://127.0.0.1:1234/v1` | You must start **LM Studio** on your own machine, load a model, and turn on the local server. |
+
+The checked-in `.env.example` already uses the school URL. At home, edit `.env.local` only.
+
+### 4. Install and start
+
+From `chatbot/`:
+
+```bash
 corepack enable
-```
-```
 corepack prepare pnpm@10.32.1 --activate
-```
-
-## 3. Environment Variables
-
-Create:
-
-```text
-.env.local
-```
-
-You should be able to just copy the .env.example file but here's info about each field
-
-in the root of the project:
-
-```text
-D:\LlamaSolutions\chatbot\.env.local
-```
-
-The file should contain:
-
-```env
-# Auth.js
-AUTH_SECRET=YOUR_RANDOM_SECRET # link to generate: https://generate-secret.vercel.app/32
-
-# PostgreSQL / Neon
-POSTGRES_URL=YOUR_NEON_POSTGRES_CONNECTION_STRING  # Find it here: https://console.neon.tech/app/projects/solitary-dust-07252132 | Click on llamasolutions project (recent one) and click connect
-
-# Vercel AI Gateway
-# Not needed while replacing the AI backend with LM Studio
-AI_GATEWAY_API_KEY=
-
-# Vercel Blob
-# Only required if using Blob functionality
-BLOB_READ_WRITE_TOKEN=
-
-# Redis
-# Only required if using Redis functionality
-REDIS_URL=
-
-LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1
-LMSTUDIO_API_KEY="Anything"    //Models don't need a key by default on lmstudio
-LMSTUDIO_MODEL="smollm2-135m-instruct"  //Change this to the id of locally running model
-```
-
-### AUTH_SECRET
-
-Generate a random secret.
-
-Click the link provided to generate a secret and paste it in
-
-# 4. PostgreSQL: Use Neon
-
-For this project, **Neon is the best balance of ease and long-term scalability**.
----
-# 6. Get the Neon Connection String
-
-In the Neon dashboard, click **Connect**.
-
-Copy the PostgreSQL connection string:
-
-Example:
-
-```text
-postgresql://username:password@ep-example-123456.region.aws.neon.tech/neondb?sslmode=require
-```
-
-
-Do not share this publicly.
-
-Add it to `.env.local`:
-
-```env
-POSTGRES_URL=postgresql://username:password@ep-example-123456.region.aws.neon.tech/neondb?sslmode=require
-```
-
-❌ Do NOT use local Postgres unless intentionally running it:
-
-```env
-POSTGRES_URL=postgresql://localhost:5432/database
-```
-
----
-
-# LMStudio setup
-<img width="2384" height="602" alt="image" src="https://github.com/user-attachments/assets/3c1ae4b5-efdb-4b2f-a0a3-7b562794c3be" />
-
-- Ensure Server status is running
-**In .env.local:**
-- LMSTUDIO_MODEL (This example is using: smollm2-135m-instruct)
-- LMSTUDIO_BASE_URL: http://127.0.0.1:1234 (local model) or http://10.118.0.111:1234 (Remote server model)- currently only works when on the Otago polytechnic network
-
-# 7.Database Migrations
-
-The chatbot requires database tables before it can function.
-
-Run:
-
-```powershell
-pnpm db:migrate
-```
-
-It will create the required schema in Neon.
-
-A successful run completes without connection errors.
-
----
-
-# 8. Start the Development Server
-
-After setup:
-
-```powershell
-pnpm dev
-```
-
-Open:
-
-```text
-http://localhost:3000
-```
-
----
-
-# 9. Current Architecture
-
-```text
-┌──────────────────────────┐
-│      Web Browser         │
-└────────────┬─────────────┘
-             │
-             v
-┌──────────────────────────┐
-│ Vercel Chatbot / Next.js │
-└────────────┬─────────────┘
-             │
-       ┌─────┴─────┐
-       │           │
-       v           v
-    Auth.js     Drizzle
-                   │
-                   v
-              PostgreSQL
-                   │
-                   v
-                  Neon
-```
-
----
-
-# 10. LM Studio (Future Step)
-
-Later, the AI backend will be replaced with **LM Studio**.
-
-```text
-┌──────────────────────────┐
-│      Web Browser         │
-└────────────┬─────────────┘
-             │
-             v
-┌──────────────────────────┐
-│ Vercel Chatbot / Next.js │
-└────────────┬─────────────┘
-             │
-       ┌─────┴──────┐
-       │            │
-       v            v
-    Drizzle      AI SDK
-       │            │
-       v            v
-     Neon       LM Studio
-                Local LLM
-```
-
-
----
-
-# Cloudflare tunnel visualisation
-
-- This is how the architecture will look like for Cloudflare to allow us to remotely reach our model
-
-<img width="1536" height="1024" alt="cloudflareTunnel" src="https://github.com/user-attachments/assets/94cc57b5-b407-47bc-9c69-4c137512393f" />
-
-
-
-## Product notes
-
-- **Speech:** Voice input uses the browser SpeechRecognition API and voice output uses `speechSynthesis`. Availability, language, and quality depend on the browser. These APIs usually require `localhost` or HTTPS and a microphone permission. Voice input fills the composer and does not auto-send.
-- **Local incognito mode:** Chats stay in IndexedDB (`llama-local` / `chats`) and do **not** write conversation data to Neon. Cloud sync mode still uses the existing Drizzle/Neon path. Switching modes asks whether to copy the current chat, leave it behind, or cancel.
-
-# Quick Reference
-
-### Start project
-
-```powershell
-cd D:\LlamaSolutions\chatbot
 pnpm install
 pnpm dev
 ```
 
-### Migrate database
+**Windows + another drive (for example `D:\`) and `corepack enable` fails with `EPERM`:** skip Corepack and use:
 
-```powershell
-pnpm db:migrate
+```bat
+npx.cmd --yes pnpm@10.32.1 install
+npx.cmd --yes pnpm@10.32.1 dev
 ```
 
-### Environment file
+Then open **[http://localhost:3000](http://localhost:3000)**.
 
-```env
-AUTH_SECRET=YOUR_RANDOM_SECRET
-POSTGRES_URL=YOUR_NEON_CONNECTION_STRING
+### 5. Read the status dot before you chat
 
-AI_GATEWAY_API_KEY=
-BLOB_READ_WRITE_TOKEN=
-REDIS_URL=
+- **Green** — the app can reach LM Studio (`GET /api/lmstudio` succeeded). You can send messages.
+- **Red** — the model is not reachable. Chat will fail until you fix the URL, campus network, or local LM Studio.
+
+The GitHub website cannot talk to `10.118.0.111`. You have to run `pnpm dev` (or the `npx.cmd` equivalent) **on a machine that is on campus Wi‑Fi** (or on a machine that can reach that IP).
+
+---
+
+## Try each feature
+
+1. **Sign in** with the guest / Auth.js flow the template already uses.
+2. **Type or dictate** a message. The **mic** fills the input; it does **not** auto-send. Press **Send** yourself.
+3. **Speak-back** — use the speaker control on the latest assistant message (Chrome / Edge).
+4. **Model picker** — change the selected model in the header; watch the green / red dot.
+5. **Export** — header **Export** → Markdown or JSON.
+6. **Rename** — sidebar chat row → **`…`** → **Rename**.
+7. **New chat / Delete all** — sidebar **New chat**, or **Delete All Chats** (with confirm).
+8. **Local incognito** — switch the header toggle. New replies stay in this browser and are **not** written to Neon. **Cloud sync** writes chats to the database again.
+
+---
+
+## Speech (mic + speak-back)
+
+- Works on **`http://localhost`** or **HTTPS**. A random LAN IP over plain HTTP often blocks the microphone.
+- Use **Chrome** or **Edge**. Allow the microphone when the browser asks.
+- The mic is dictation only; you still click send.
+
+---
+
+## Optional: database migrate
+
+If the UI loads but cloud chats error on first save, from `chatbot/` run:
+
+```bash
+npx.cmd --yes pnpm@10.32.1 db:migrate
 ```
 
+(or `pnpm db:migrate` if Corepack/pnpm already works). You still need a valid `POSTGRES_URL` in `.env.local` — take it from `.env.example` or your teammate, **not** from this README.
 
+---
 
+## Project layout
+
+| Path | What it is |
+| --- | --- |
+| [`README.md`](./README.md) | **This file** — classmate / teammate setup + feature guide |
+| [`chatbot/`](./chatbot/) | Next.js app (run commands here) |
+| [`chatbot/README.md`](./chatbot/README.md) | Upstream Vercel template notes (not the getting-started guide) |
+| [`chatbot/.env.example`](./chatbot/.env.example) | Env variable names and placeholders — copy to `.env.local` |
+
+---
+
+## Extra (not required for class)
+
+Some teammates expose a home LM Studio with a Cloudflare named tunnel (`trycloudflare.com`). That is optional. For school labs, prefer `10.118.0.111` on campus Wi‑Fi.
