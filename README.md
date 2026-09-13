@@ -233,6 +233,11 @@ Later, the AI backend will be replaced with **LM Studio**.
 
 
 
+## Product notes
+
+- **Speech:** Voice input uses the browser SpeechRecognition API and voice output uses `speechSynthesis`. Availability, language, and quality depend on the browser. These APIs usually require `localhost` or HTTPS and a microphone permission. Voice input fills the composer and does not auto-send.
+- **Local incognito mode:** Chats stay in IndexedDB (`llama-local` / `chats`) and do **not** write conversation data to Neon. Cloud sync mode still uses the existing Drizzle/Neon path. Switching modes asks whether to copy the current chat, leave it behind, or cancel.
+
 # Quick Reference
 
 ### Start project

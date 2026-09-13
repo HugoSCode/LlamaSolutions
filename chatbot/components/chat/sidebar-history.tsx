@@ -4,8 +4,9 @@ import { isToday, isYesterday, subMonths, subWeeks } from "date-fns";
 import { motion } from "framer-motion";
 import { usePathname, useRouter } from "next/navigation";
 import type { User } from "next-auth";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useSWRConfig } from "swr";
 import useSWRInfinite from "swr/infinite";
 import {
   AlertDialog,
@@ -24,10 +25,22 @@ import {
   SidebarMenu,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useActiveChat } from "@/hooks/use-active-chat";
+import { useLocalHistory } from "@/hooks/use-local-history";
+import { useRenameRequest } from "@/hooks/use-rename-request";
+import { useSyncMode } from "@/hooks/use-sync-mode";
+import { deleteChatByMode } from "@/lib/chat-client";
+import {
+  type ChatHistory,
+  getChatHistoryPaginationKey,
+} from "@/lib/chat-history";
 import type { Chat } from "@/lib/db/schema";
+import { LOCAL_HISTORY_SWR_KEY, localChatToChat } from "@/lib/local-chats";
 import { fetcher } from "@/lib/utils";
 import { LoaderIcon } from "./icons";
 import { ChatItem } from "./sidebar-history-item";
+
+export type { ChatHistory } from "@/lib/chat-history";
 
 type GroupedChats = {
   today: Chat[];
@@ -36,13 +49,6 @@ type GroupedChats = {
   lastMonth: Chat[];
   older: Chat[];
 };
-
-export type ChatHistory = {
-  chats: Chat[];
-  hasMore: boolean;
-};
-
-const PAGE_SIZE = 20;
 
 const groupChatsByDate = (chats: Chat[]): GroupedChats => {
   const now = new Date();
@@ -77,31 +83,18 @@ const groupChatsByDate = (chats: Chat[]): GroupedChats => {
   );
 };
 
-export function getChatHistoryPaginationKey(
-  pageIndex: number,
-  previousPageData: ChatHistory
-) {
-  if (previousPageData && previousPageData.hasMore === false) {
-    return null;
-  }
-
-  if (pageIndex === 0) {
-    return `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history?limit=${PAGE_SIZE}`;
-  }
-
-  const firstChatFromPage = previousPageData.chats.at(-1);
-
-  if (!firstChatFromPage) {
-    return null;
-  }
-
-  return `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history?ending_before=${firstChatFromPage.id}&limit=${PAGE_SIZE}`;
-}
-
 export function SidebarHistory({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
   const pathname = usePathname();
   const id = pathname?.startsWith("/chat/") ? pathname.split("/")[2] : null;
+  const { isLocal } = useSyncMode();
+  const { chatId, chatTitle, messages, setChatTitle } = useActiveChat();
+  const { mutate: globalMutate } = useSWRConfig();
+  const {
+    data: localRecords = [],
+    isLoading: isLocalLoading,
+    mutate: mutateLocal,
+  } = useLocalHistory(isLocal);
 
   const {
     data: paginatedChatHistories,
@@ -110,7 +103,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     isLoading,
     mutate,
   } = useSWRInfinite<ChatHistory>(
-    user ? getChatHistoryPaginationKey : () => null,
+    user && !isLocal ? getChatHistoryPaginationKey : () => null,
     fetcher,
     { fallbackData: [], revalidateOnFocus: false }
   );
@@ -118,6 +111,62 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   const router = useRouter();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+
+  const localChats = useMemo(
+    () => localRecords.map(localChatToChat),
+    [localRecords]
+  );
+
+  const handleStartRename = useCallback((chatIdToRename: string) => {
+    setRenamingId(chatIdToRename);
+  }, []);
+
+  const handleRenameRequest = useCallback(
+    (chatIdToRename: string) => {
+      const knownIds = isLocal
+        ? localChats.map((chat) => chat.id)
+        : (paginatedChatHistories ?? []).flatMap((page) =>
+            page.chats.map((chat) => chat.id)
+          );
+
+      if (!knownIds.includes(chatIdToRename)) {
+        toast("发送一条消息后再重命名");
+        return;
+      }
+
+      setRenamingId(chatIdToRename);
+    },
+    [isLocal, localChats, paginatedChatHistories]
+  );
+
+  useRenameRequest(handleRenameRequest);
+
+  const handleRenamed = useCallback(
+    (renamedId: string, title: string) => {
+      setRenamingId(null);
+
+      if (renamedId === chatId) {
+        setChatTitle(title);
+      }
+
+      if (isLocal) {
+        mutateLocal();
+        globalMutate(LOCAL_HISTORY_SWR_KEY);
+        return;
+      }
+
+      mutate((chatHistories) =>
+        chatHistories?.map((chatHistory) => ({
+          ...chatHistory,
+          chats: chatHistory.chats.map((chat) =>
+            chat.id === renamedId ? { ...chat, title } : chat
+          ),
+        }))
+      );
+    },
+    [chatId, globalMutate, isLocal, mutate, mutateLocal, setChatTitle]
+  );
 
   const hasReachedEnd = paginatedChatHistories
     ? paginatedChatHistories.some((page) => page.hasMore === false)
@@ -133,29 +182,37 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
     setShowDeleteDialog(false);
 
+    if (!chatToDelete) {
+      return;
+    }
+
     if (isCurrentChat) {
       router.replace("/");
     }
 
-    mutate((chatHistories) => {
-      if (chatHistories) {
-        return chatHistories.map((chatHistory) => ({
-          ...chatHistory,
-          chats: chatHistory.chats.filter((chat) => chat.id !== chatToDelete),
-        }));
-      }
-    });
+    if (isLocal) {
+      deleteChatByMode({ chatId: chatToDelete, isLocal: true }).then(() => {
+        mutateLocal();
+        globalMutate(LOCAL_HISTORY_SWR_KEY);
+      });
+    } else {
+      mutate((chatHistories) => {
+        if (chatHistories) {
+          return chatHistories.map((chatHistory) => ({
+            ...chatHistory,
+            chats: chatHistory.chats.filter((chat) => chat.id !== chatToDelete),
+          }));
+        }
+      });
 
-    fetch(
-      `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/chat?id=${chatToDelete}`,
-      { method: "DELETE" }
-    );
+      deleteChatByMode({ chatId: chatToDelete, isLocal: false });
+    }
 
     toast.success("Chat deleted");
-  }, [deleteId, mutate, pathname, router]);
+  }, [deleteId, globalMutate, isLocal, mutate, mutateLocal, pathname, router]);
 
-  const handleShowDeleteDialog = useCallback((chatId: string) => {
-    setDeleteId(chatId);
+  const handleShowDeleteDialog = useCallback((targetChatId: string) => {
+    setDeleteId(targetChatId);
     setShowDeleteDialog(true);
   }, []);
 
@@ -165,7 +222,13 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     }
   }, [hasReachedEnd, isValidating, setSize]);
 
-  if (!user) {
+  const currentExport = {
+    id: chatId,
+    messages,
+    title: chatTitle,
+  };
+
+  if (!user && !isLocal) {
     return (
       <SidebarGroup className="group-data-[collapsible=icon]:hidden">
         <SidebarGroupContent>
@@ -177,7 +240,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     );
   }
 
-  if (isLoading) {
+  if ((isLocal && isLocalLoading) || (!isLocal && isLoading)) {
     return (
       <SidebarGroup className="group-data-[collapsible=icon]:hidden">
         <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
@@ -206,7 +269,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     );
   }
 
-  if (hasEmptyChatHistory) {
+  const hasEmptyLocalHistory = isLocal && localChats.length === 0;
+
+  if ((isLocal && hasEmptyLocalHistory) || (!isLocal && hasEmptyChatHistory)) {
     return (
       <SidebarGroup className="group-data-[collapsible=icon]:hidden">
         <SidebarGroupLabel className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
@@ -229,109 +294,131 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
         </SidebarGroupLabel>
         <SidebarGroupContent>
           <SidebarMenu>
-            {paginatedChatHistories
-              ? (() => {
-                  const chatsFromHistory = paginatedChatHistories.flatMap(
+            {(() => {
+              const chatsFromHistory = isLocal
+                ? localChats
+                : (paginatedChatHistories ?? []).flatMap(
                     (paginatedChatHistory) => paginatedChatHistory.chats
                   );
 
-                  const groupedChats = groupChatsByDate(chatsFromHistory);
+              const groupedChats = groupChatsByDate(chatsFromHistory);
 
-                  return (
-                    <div className="flex flex-col gap-4">
-                      {groupedChats.today.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
-                            Today
-                          </div>
-                          {groupedChats.today.map((chat) => (
-                            <ChatItem
-                              chat={chat}
-                              isActive={chat.id === id}
-                              key={chat.id}
-                              onDelete={handleShowDeleteDialog}
-                              setOpenMobile={setOpenMobile}
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {groupedChats.yesterday.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
-                            Yesterday
-                          </div>
-                          {groupedChats.yesterday.map((chat) => (
-                            <ChatItem
-                              chat={chat}
-                              isActive={chat.id === id}
-                              key={chat.id}
-                              onDelete={handleShowDeleteDialog}
-                              setOpenMobile={setOpenMobile}
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {groupedChats.lastWeek.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
-                            Last 7 days
-                          </div>
-                          {groupedChats.lastWeek.map((chat) => (
-                            <ChatItem
-                              chat={chat}
-                              isActive={chat.id === id}
-                              key={chat.id}
-                              onDelete={handleShowDeleteDialog}
-                              setOpenMobile={setOpenMobile}
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {groupedChats.lastMonth.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
-                            Last 30 days
-                          </div>
-                          {groupedChats.lastMonth.map((chat) => (
-                            <ChatItem
-                              chat={chat}
-                              isActive={chat.id === id}
-                              key={chat.id}
-                              onDelete={handleShowDeleteDialog}
-                              setOpenMobile={setOpenMobile}
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {groupedChats.older.length > 0 && (
-                        <div>
-                          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
-                            Older
-                          </div>
-                          {groupedChats.older.map((chat) => (
-                            <ChatItem
-                              chat={chat}
-                              isActive={chat.id === id}
-                              key={chat.id}
-                              onDelete={handleShowDeleteDialog}
-                              setOpenMobile={setOpenMobile}
-                            />
-                          ))}
-                        </div>
-                      )}
+              return (
+                <div className="flex flex-col gap-4">
+                  {groupedChats.today.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
+                        Today
+                      </div>
+                      {groupedChats.today.map((chat) => (
+                        <ChatItem
+                          chat={chat}
+                          currentExport={currentExport}
+                          isActive={chat.id === id}
+                          isRenaming={renamingId === chat.id}
+                          key={chat.id}
+                          onDelete={handleShowDeleteDialog}
+                          onRenamed={handleRenamed}
+                          onStartRename={handleStartRename}
+                          setOpenMobile={setOpenMobile}
+                        />
+                      ))}
                     </div>
-                  );
-                })()
-              : null}
+                  )}
+
+                  {groupedChats.yesterday.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
+                        Yesterday
+                      </div>
+                      {groupedChats.yesterday.map((chat) => (
+                        <ChatItem
+                          chat={chat}
+                          currentExport={currentExport}
+                          isActive={chat.id === id}
+                          isRenaming={renamingId === chat.id}
+                          key={chat.id}
+                          onDelete={handleShowDeleteDialog}
+                          onRenamed={handleRenamed}
+                          onStartRename={handleStartRename}
+                          setOpenMobile={setOpenMobile}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {groupedChats.lastWeek.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
+                        Last 7 days
+                      </div>
+                      {groupedChats.lastWeek.map((chat) => (
+                        <ChatItem
+                          chat={chat}
+                          currentExport={currentExport}
+                          isActive={chat.id === id}
+                          isRenaming={renamingId === chat.id}
+                          key={chat.id}
+                          onDelete={handleShowDeleteDialog}
+                          onRenamed={handleRenamed}
+                          onStartRename={handleStartRename}
+                          setOpenMobile={setOpenMobile}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {groupedChats.lastMonth.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
+                        Last 30 days
+                      </div>
+                      {groupedChats.lastMonth.map((chat) => (
+                        <ChatItem
+                          chat={chat}
+                          currentExport={currentExport}
+                          isActive={chat.id === id}
+                          isRenaming={renamingId === chat.id}
+                          key={chat.id}
+                          onDelete={handleShowDeleteDialog}
+                          onRenamed={handleRenamed}
+                          onStartRename={handleStartRename}
+                          setOpenMobile={setOpenMobile}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {groupedChats.older.length > 0 && (
+                    <div>
+                      <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-foreground/70">
+                        Older
+                      </div>
+                      {groupedChats.older.map((chat) => (
+                        <ChatItem
+                          chat={chat}
+                          currentExport={currentExport}
+                          isActive={chat.id === id}
+                          isRenaming={renamingId === chat.id}
+                          key={chat.id}
+                          onDelete={handleShowDeleteDialog}
+                          onRenamed={handleRenamed}
+                          onStartRename={handleStartRename}
+                          setOpenMobile={setOpenMobile}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </SidebarMenu>
 
-          <motion.div onViewportEnter={handleViewportEnter} />
+          {isLocal ? null : (
+            <motion.div onViewportEnter={handleViewportEnter} />
+          )}
 
-          {hasReachedEnd ? null : (
+          {isLocal || hasReachedEnd ? null : (
             <div className="mt-1 flex flex-row items-center gap-2 px-4 py-2 text-sidebar-foreground/50">
               <div className="animate-spin">
                 <LoaderIcon />

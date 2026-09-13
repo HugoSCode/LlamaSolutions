@@ -1,11 +1,13 @@
 "use client";
 
 import { PanelLeftIcon } from "lucide-react";
-import Link from "next/link";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
-import { VercelIcon } from "./icons";
+import { useActiveChat } from "@/hooks/use-active-chat";
+import { useSyncMode } from "@/hooks/use-sync-mode";
+import { ExportChatButton } from "./export-chat-button";
+import { SyncModeToggle } from "./sync-mode-toggle";
 import { VisibilitySelector, type VisibilityType } from "./visibility-selector";
 
 function PureChatHeader({
@@ -17,15 +19,15 @@ function PureChatHeader({
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
 }) {
-  const { state, toggleSidebar, isMobile } = useSidebar();
-
-  if (state === "collapsed" && !isMobile) {
-    return null;
-  }
+  const { toggleSidebar } = useSidebar();
+  const { isLocal } = useSyncMode();
+  const { chatTitle, messages } = useActiveChat();
 
   return (
     <header className="sticky top-0 flex h-14 items-center gap-2 bg-sidebar px-3">
-          <h1 className="text-white text-2xl font-bold">🦙LLAMA solutions</h1>
+      <h1 className="shrink-0 text-white text-2xl font-bold">
+        🦙LLAMA solutions
+      </h1>
       <Button
         className="md:hidden"
         onClick={toggleSidebar}
@@ -35,35 +37,23 @@ function PureChatHeader({
         <PanelLeftIcon className="size-4" />
       </Button>
 
-      <Link
-        className="flex size-8 items-center justify-center rounded-lg md:hidden"
-        href="https://vercel.com/templates/next.js/chatbot"
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        <VercelIcon size={14} />
-      </Link>
-
-      {!isReadonly && (
-        <VisibilitySelector
+      <div className="ml-auto flex min-w-0 items-center gap-2">
+        {!isReadonly && !isLocal && (
+          <VisibilitySelector
+            chatId={chatId}
+            selectedVisibilityType={selectedVisibilityType}
+          />
+        )}
+        <ExportChatButton
           chatId={chatId}
-          selectedVisibilityType={selectedVisibilityType}
+          fallback={{
+            id: chatId,
+            messages,
+            title: chatTitle,
+          }}
         />
-      )}
-
-      <Button
-        asChild
-        className="hidden rounded-lg bg-foreground px-4 text-background hover:bg-foreground/90 md:ml-auto md:flex"
-      >
-        <Link
-          href="https://vercel.com/templates/next.js/chatbot"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <VercelIcon size={16} />
-          Deploy with Vercel
-        </Link>
-      </Button>
+        <SyncModeToggle chatId={chatId} messages={messages} title={chatTitle} />
+      </div>
     </header>
   );
 }

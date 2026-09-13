@@ -1,3 +1,5 @@
+import { probeLmStudio } from "./lmstudio";
+
 export const DEFAULT_CHAT_MODEL = "qwen/qwen3-vl-4b";
  
 export const titleModel = {
@@ -75,11 +77,18 @@ export type ModelAvailability = "healthy" | "impacted" | "unknown";
 export async function getModelAvailability(
   modelId: string
 ): Promise<ModelAvailability> {
-  if (!allowedModelIds.has(modelId)) {
-    return "unknown";
+  const probe = await probeLmStudio();
+
+  if (probe.status !== "healthy") {
+    return "impacted";
   }
- 
-  // LM Studio is local, so there is no Vercel Gateway
-  // endpoint to query for availability.
-  return "healthy";
+
+  if (
+    allowedModelIds.has(modelId) ||
+    probe.models.some((model) => model.id === modelId)
+  ) {
+    return "healthy";
+  }
+
+  return "unknown";
 }

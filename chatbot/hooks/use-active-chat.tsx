@@ -18,18 +18,26 @@ import {
 import useSWR, { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { useDataStream } from "@/components/chat/data-stream-provider";
-import { getChatHistoryPaginationKey } from "@/components/chat/sidebar-history";
 import { toast } from "@/components/chat/toast";
 import type { VisibilityType } from "@/components/chat/visibility-selector";
 import { useAutoResume } from "@/hooks/use-auto-resume";
+import { useSyncMode } from "@/hooks/use-sync-mode";
 import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
+import { getChatHistoryPaginationKey } from "@/lib/chat-history";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
+import {
+  getLocalChat,
+  LOCAL_HISTORY_SWR_KEY,
+  upsertLocalChat,
+} from "@/lib/local-chats";
 import type { ChatMessage } from "@/lib/types";
 import { fetcher, fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
 
 type ActiveChatContextValue = {
   chatId: string;
+  chatTitle: string;
+  setChatTitle: Dispatch<SetStateAction<string>>;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
@@ -60,6 +68,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { setDataStream, setWaitingStatus } = useDataStream();
   const { mutate } = useSWRConfig();
+  const { isLocal } = useSyncMode();
+  const persistRef = useRef(!isLocal);
+  persistRef.current = !isLocal;
 
   const chatIdFromUrl = extractChatId(pathname);
   const isNewChat = !chatIdFromUrl;
@@ -81,21 +92,36 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
 
   const [input, setInput] = useState("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
+  const [chatTitle, setChatTitle] = useState("New chat");
+  const chatTitleRef = useRef(chatTitle);
+  chatTitleRef.current = chatTitle;
 
-  const { data: chatData, isLoading } = useSWR(
-    isNewChat
+  const { data: chatData, isLoading: isCloudLoading } = useSWR(
+    isLocal || isNewChat
       ? null
       : `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/messages?chatId=${chatId}`,
     fetcher,
     { revalidateOnFocus: false }
   );
+  const { data: localChat, isLoading: isLocalLoading } = useSWR(
+    isLocal && !isNewChat ? `llama-local-chat:${chatId}` : null,
+    () => getLocalChat(chatId),
+    { revalidateOnFocus: false }
+  );
 
   const initialMessages: ChatMessage[] = isNewChat
     ? []
-    : (chatData?.messages ?? []);
-  const visibility: VisibilityType = isNewChat
+    : isLocal
+      ? (localChat?.messages ?? [])
+      : (chatData?.messages ?? []);
+  const visibility: VisibilityType = isLocal
     ? "private"
-    : (chatData?.visibility ?? "private");
+    : isNewChat
+      ? "private"
+      : (chatData?.visibility ?? "private");
+  const isLoading = isLocal
+    ? Boolean(isLocalLoading && !isNewChat)
+    : isCloudLoading;
 
   const {
     messages,
@@ -115,6 +141,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
         setWaitingStatus(dataPart.data);
         return;
       }
+      if (dataPart.type === "data-chat-title") {
+        setChatTitle(dataPart.data);
+      }
       setDataStream((ds) => (ds ? [...ds, dataPart] : []));
     },
     onError: (error) => {
@@ -130,7 +159,9 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       }
     },
     onFinish: () => {
-      mutate(unstable_serialize(getChatHistoryPaginationKey));
+      if (persistRef.current) {
+        mutate(unstable_serialize(getChatHistoryPaginationKey));
+      }
     },
     sendAutomaticallyWhen: ({ messages: currentMessages }) => {
       const lastMessage = currentMessages.at(-1);
@@ -160,11 +191,14 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
             })
           );
 
+        const persist = persistRef.current;
+
         return {
           body: {
             id: request.id,
-            ...(isToolApprovalContinuation
-              ? { messages: request.messages }
+            persist,
+            ...(isToolApprovalContinuation || !persist
+              ? { message: lastMessage, messages: request.messages }
               : { message: lastMessage }),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibility,
@@ -187,15 +221,28 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     loadedChatIds.current.add(newChatIdRef.current);
   }
 
+  const prevLocalRef = useRef(isLocal);
+  useEffect(() => {
+    if (prevLocalRef.current !== isLocal) {
+      prevLocalRef.current = isLocal;
+      loadedChatIds.current.delete(chatId);
+    }
+  }, [chatId, isLocal]);
+
   useEffect(() => {
     if (loadedChatIds.current.has(chatId)) {
       return;
     }
-    if (chatData?.messages) {
+    if (isLocal && localChat?.messages) {
+      loadedChatIds.current.add(chatId);
+      setMessages(localChat.messages);
+      return;
+    }
+    if (!isLocal && chatData?.messages) {
       loadedChatIds.current.add(chatId);
       setMessages(chatData.messages);
     }
-  }, [chatId, chatData?.messages, setMessages]);
+  }, [chatId, chatData?.messages, isLocal, localChat?.messages, setMessages]);
 
   const prevChatIdRef = useRef(chatId);
   useEffect(() => {
@@ -208,7 +255,17 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   }, [chatId, isNewChat, setMessages]);
 
   useEffect(() => {
-    if (chatData && !isNewChat) {
+    if (isNewChat) {
+      setChatTitle("New chat");
+    } else if (isLocal && localChat?.title) {
+      setChatTitle(localChat.title);
+    } else if (chatData?.title) {
+      setChatTitle(chatData.title);
+    }
+  }, [chatData?.title, isLocal, isNewChat, localChat?.title]);
+
+  useEffect(() => {
+    if ((chatData || localChat) && !isNewChat) {
       const cookieModel = document.cookie
         .split("; ")
         .find((row) => row.startsWith("chat-model="))
@@ -217,7 +274,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
         setCurrentModelId(decodeURIComponent(cookieModel));
       }
     }
-  }, [chatData, isNewChat]);
+  }, [chatData, isNewChat, localChat]);
 
   const hasAppendedQueryRef = useRef(false);
   useEffect(() => {
@@ -238,26 +295,45 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
   }, [sendMessage, chatId]);
 
   useAutoResume({
-    autoResume: !isNewChat && !!chatData,
+    autoResume: !isLocal && !isNewChat && !!chatData,
     initialMessages,
     resumeStream,
     setMessages,
   });
 
-  const isReadonly = isNewChat ? false : (chatData?.isReadonly ?? false);
+  const isReadonly = isLocal
+    ? false
+    : isNewChat
+      ? false
+      : (chatData?.isReadonly ?? false);
 
   const { data: votes } = useSWR<Vote[]>(
-    !isReadonly && messages.length >= 2
+    !isLocal && !isReadonly && messages.length >= 2
       ? `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/vote?chatId=${chatId}`
       : null,
     fetcher,
     { revalidateOnFocus: false }
   );
 
+  useEffect(() => {
+    if (!isLocal || messages.length === 0) {
+      return;
+    }
+
+    upsertLocalChat({
+      id: chatId,
+      messages,
+      title: chatTitle,
+    }).then(() => {
+      mutate(LOCAL_HISTORY_SWR_KEY);
+    });
+  }, [chatId, chatTitle, isLocal, messages, mutate]);
+
   const value = useMemo<ActiveChatContextValue>(
     () => ({
       addToolApprovalResponse,
       chatId,
+      chatTitle,
       currentModelId,
       input,
       isLoading: !isNewChat && isLoading,
@@ -265,6 +341,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
       messages,
       regenerate,
       sendMessage,
+      setChatTitle,
       setCurrentModelId,
       setInput,
       setMessages,
@@ -277,6 +354,7 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     }),
     [
       chatId,
+      chatTitle,
       messages,
       setMessages,
       sendMessage,

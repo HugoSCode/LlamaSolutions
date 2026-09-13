@@ -1,8 +1,11 @@
 import equal from "fast-deep-equal";
+import { SquareIcon, Volume2Icon } from "lucide-react";
 import { memo, useCallback } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { useCopyToClipboard } from "usehooks-ts";
+import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
+import { useSyncMode } from "@/hooks/use-sync-mode";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import {
@@ -26,6 +29,10 @@ export function PureMessageActions({
 }) {
   const { mutate } = useSWRConfig();
   const [_, copyToClipboard] = useCopyToClipboard();
+  const { isLocal } = useSyncMode();
+  const { isSpeakingThis, speak, stop, supported } = useSpeechSynthesis(
+    message.id
+  );
 
   const textFromParts = message.parts
     ?.filter((part) => part.type === "text")
@@ -43,7 +50,30 @@ export function PureMessageActions({
     toast.success("Copied to clipboard!");
   }, [copyToClipboard, textFromParts]);
 
+  const handleSpeak = useCallback(() => {
+    if (isSpeakingThis) {
+      stop();
+      return;
+    }
+
+    if (!supported) {
+      toast.error("当前浏览器不支持语音播报");
+      return;
+    }
+
+    if (!textFromParts) {
+      toast.error("这条回复没有可朗读的文本");
+      return;
+    }
+
+    speak(textFromParts);
+  }, [isSpeakingThis, speak, stop, supported, textFromParts]);
+
   const handleUpvote = useCallback(() => {
+    if (isLocal) {
+      return;
+    }
+
     const upvote = fetch(
       `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/vote`,
       {
@@ -86,9 +116,13 @@ export function PureMessageActions({
         return "Upvoted Response!";
       },
     });
-  }, [chatId, message.id, mutate]);
+  }, [chatId, isLocal, message.id, mutate]);
 
   const handleDownvote = useCallback(() => {
+    if (isLocal) {
+      return;
+    }
+
     const downvote = fetch(
       `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/vote`,
       {
@@ -131,7 +165,7 @@ export function PureMessageActions({
         return "Downvoted Response!";
       },
     });
-  }, [chatId, message.id, mutate]);
+  }, [chatId, isLocal, message.id, mutate]);
 
   if (isLoading) {
     return null;
@@ -175,23 +209,40 @@ export function PureMessageActions({
 
       <Action
         className="text-muted-foreground/50 hover:text-foreground"
-        data-testid="message-upvote"
-        disabled={vote?.isUpvoted}
-        onClick={handleUpvote}
-        tooltip="Upvote Response"
+        data-testid="message-speak"
+        onClick={handleSpeak}
+        tooltip={isSpeakingThis ? "停止播报" : "朗读回复"}
       >
-        <ThumbUpIcon />
+        {isSpeakingThis ? (
+          <SquareIcon className="size-3.5" />
+        ) : (
+          <Volume2Icon className="size-3.5" />
+        )}
       </Action>
 
-      <Action
-        className="text-muted-foreground/50 hover:text-foreground"
-        data-testid="message-downvote"
-        disabled={vote && !vote.isUpvoted}
-        onClick={handleDownvote}
-        tooltip="Downvote Response"
-      >
-        <ThumbDownIcon />
-      </Action>
+      {isLocal ? null : (
+        <>
+          <Action
+            className="text-muted-foreground/50 hover:text-foreground"
+            data-testid="message-upvote"
+            disabled={vote?.isUpvoted}
+            onClick={handleUpvote}
+            tooltip="Upvote Response"
+          >
+            <ThumbUpIcon />
+          </Action>
+
+          <Action
+            className="text-muted-foreground/50 hover:text-foreground"
+            data-testid="message-downvote"
+            disabled={vote && !vote.isUpvoted}
+            onClick={handleDownvote}
+            tooltip="Downvote Response"
+          >
+            <ThumbDownIcon />
+          </Action>
+        </>
+      )}
     </Actions>
   );
 }
@@ -203,6 +254,9 @@ export const MessageActions = memo(
       return false;
     }
     if (prevProps.isLoading !== nextProps.isLoading) {
+      return false;
+    }
+    if (prevProps.message.id !== nextProps.message.id) {
       return false;
     }
 

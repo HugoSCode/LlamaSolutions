@@ -7,6 +7,7 @@ import { DataStreamProvider } from "@/components/chat/data-stream-provider";
 import { ChatShell } from "@/components/chat/shell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ActiveChatProvider } from "@/hooks/use-active-chat";
+import { SyncModeProvider } from "@/hooks/use-sync-mode";
 import { auth } from "../(auth)/auth";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -28,26 +29,29 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 async function SidebarShell({ children }: { children: React.ReactNode }) {
   const [session, cookieStore] = await Promise.all([auth(), cookies()]);
   const isCollapsed = cookieStore.get("sidebar_state")?.value !== "true";
+  const canUseCloud = Boolean(session?.user);
 
   return (
-    <SidebarProvider defaultOpen={!isCollapsed}>
-      <AppSidebar user={session?.user} />
-      <SidebarInset>
-        <Toaster
-          position="top-center"
-          theme="system"
-          toastOptions={{
-            className:
-              "!bg-card !text-foreground !border-border/50 !shadow-[var(--shadow-float)]",
-          }}
-        />
-        <Suspense fallback={<div className="flex h-dvh" />}>
-          <ActiveChatProvider>
-            <ChatShell />
-          </ActiveChatProvider>
-        </Suspense>
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
+    <SyncModeProvider canUseCloud={canUseCloud}>
+      <SidebarProvider defaultOpen={!isCollapsed}>
+        <ActiveChatProvider>
+          <AppSidebar user={session?.user} />
+          <SidebarInset>
+            <Toaster
+              position="top-center"
+              theme="system"
+              toastOptions={{
+                className:
+                  "!bg-card !text-foreground !border-border/50 !shadow-[var(--shadow-float)]",
+              }}
+            />
+            <Suspense fallback={<div className="flex h-dvh" />}>
+              <ChatShell />
+            </Suspense>
+            {children}
+          </SidebarInset>
+        </ActiveChatProvider>
+      </SidebarProvider>
+    </SyncModeProvider>
   );
 }

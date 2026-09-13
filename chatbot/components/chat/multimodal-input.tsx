@@ -24,7 +24,8 @@ import {
   useState,
 } from "react";
 import { toast } from "sonner";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
+import { unstable_serialize } from "swr/infinite";
 import { useLocalStorage, useWindowSize } from "usehooks-ts";
 import {
   ModelSelector,
@@ -37,12 +38,22 @@ import {
   ModelSelectorName,
   ModelSelectorTrigger,
 } from "@/components/ai-elements/model-selector";
+import { requestChatRename } from "@/hooks/use-rename-request";
+import { useSyncMode } from "@/hooks/use-sync-mode";
+import type { LmStudioProbeResult } from "@/lib/ai/lmstudio";
 import {
   type ChatModel,
   chatModels,
   DEFAULT_CHAT_MODEL,
   type ModelCapabilities,
 } from "@/lib/ai/models";
+import {
+  deleteAllChatsByMode,
+  deleteChatByMode,
+  fileToDataUrl,
+} from "@/lib/chat-client";
+import { getChatHistoryPaginationKey } from "@/lib/chat-history";
+import { LOCAL_HISTORY_SWR_KEY } from "@/lib/local-chats";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -63,6 +74,7 @@ import {
 } from "./slash-commands";
 import { SuggestedActions } from "./suggested-actions";
 import type { VisibilityType } from "./visibility-selector";
+import { VoiceInputButton } from "./voice-input-button";
 
 function setCookie(name: string, value: string) {
   const maxAge = 60 * 60 * 24 * 365;
@@ -111,6 +123,8 @@ function PureMultimodalInput({
 }) {
   const router = useRouter();
   const { setTheme, resolvedTheme } = useTheme();
+  const { isLocal } = useSyncMode();
+  const { mutate } = useSWRConfig();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const hasAutoFocused = useRef(false);
@@ -175,7 +189,7 @@ function PureMultimodalInput({
           setMessages(() => []);
           break;
         case "rename":
-          toast("Rename is available from the sidebar chat menu.");
+          requestChatRename(chatId);
           break;
         case "model": {
           const modelBtn = document.querySelector<HTMLButtonElement>(
@@ -192,12 +206,12 @@ function PureMultimodalInput({
             action: {
               label: "Delete",
               onClick: () => {
-                fetch(
-                  `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/chat?id=${chatId}`,
-                  { method: "DELETE" }
-                );
-                router.push("/");
-                toast.success("Chat deleted");
+                deleteChatByMode({ chatId, isLocal }).then(() => {
+                  mutate(LOCAL_HISTORY_SWR_KEY);
+                  mutate(unstable_serialize(getChatHistoryPaginationKey));
+                  router.push("/");
+                  toast.success("Chat deleted");
+                });
               },
             },
           });
@@ -207,14 +221,12 @@ function PureMultimodalInput({
             action: {
               label: "Delete all",
               onClick: () => {
-                fetch(
-                  `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history`,
-                  {
-                    method: "DELETE",
-                  }
-                );
-                router.push("/");
-                toast.success("All chats deleted");
+                deleteAllChatsByMode(isLocal).then(() => {
+                  mutate(LOCAL_HISTORY_SWR_KEY);
+                  mutate(unstable_serialize(getChatHistoryPaginationKey));
+                  router.push("/");
+                  toast.success("All chats deleted");
+                });
               },
             },
           });
@@ -223,7 +235,16 @@ function PureMultimodalInput({
           break;
       }
     },
-    [chatId, resolvedTheme, router, setInput, setMessages, setTheme]
+    [
+      chatId,
+      isLocal,
+      mutate,
+      resolvedTheme,
+      router,
+      setInput,
+      setMessages,
+      setTheme,
+    ]
   );
 
   const submitForm = useCallback(() => {
@@ -267,35 +288,52 @@ function PureMultimodalInput({
     chatId,
   ]);
 
-  const uploadFile = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/files/upload`,
-        {
-          body: formData,
-          method: "POST",
+  const uploadFile = useCallback(
+    async (file: File) => {
+      if (isLocal) {
+        try {
+          const url = await fileToDataUrl(file);
+          return {
+            contentType: file.type,
+            name: file.name,
+            url,
+          };
+        } catch {
+          toast.error("Failed to attach file, please try again!");
+          return;
         }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const { url, pathname, contentType } = data;
-
-        return {
-          contentType,
-          name: pathname,
-          url,
-        };
       }
-      const { error } = await response.json();
-      toast.error(error);
-    } catch {
-      toast.error("Failed to upload file, please try again!");
-    }
-  }, []);
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/files/upload`,
+          {
+            body: formData,
+            method: "POST",
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          const { url, pathname, contentType } = data;
+
+          return {
+            contentType,
+            name: pathname,
+            url,
+          };
+        }
+        const { error } = await response.json();
+        toast.error(error);
+      } catch {
+        toast.error("Failed to upload file, please try again!");
+      }
+    },
+    [isLocal]
+  );
 
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
@@ -550,6 +588,11 @@ function PureMultimodalInput({
               selectedModelId={selectedModelId}
               status={status}
             />
+            <VoiceInputButton
+              disabled={status !== "ready" && status !== "error"}
+              input={input}
+              setInput={setInput}
+            />
             <ModelSelectorCompact
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}
@@ -783,6 +826,34 @@ function ModelSelectorOption({
   );
 }
 
+function ConnectionStatusDot({
+  status,
+}: {
+  status: LmStudioProbeResult["status"] | undefined;
+}) {
+  const label =
+    status === "healthy"
+      ? "LM Studio 已连接"
+      : status === "impacted"
+        ? "LM Studio 不可用"
+        : "正在检测 LM Studio";
+
+  return (
+    <span
+      aria-label={label}
+      className={cn(
+        "inline-block size-2 shrink-0 rounded-full",
+        status === "healthy" && "bg-emerald-500",
+        status === "impacted" && "bg-red-500",
+        (status === "unknown" || !status) && "bg-muted-foreground/40"
+      )}
+      data-testid="lmstudio-status-dot"
+      role="img"
+      title={label}
+    />
+  );
+}
+
 function PureModelSelectorCompact({
   selectedModelId,
   onModelChange,
@@ -796,10 +867,16 @@ function PureModelSelectorCompact({
     (url: string) => fetch(url).then((r) => r.json()),
     { dedupingInterval: 3_600_000, revalidateOnFocus: false }
   );
+  const { data: lmStudio } = useSWR<LmStudioProbeResult>(
+    `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/lmstudio`,
+    (url: string) => fetch(url).then((r) => r.json()),
+    { refreshInterval: 20_000, revalidateOnFocus: true }
+  );
 
   const capabilities: Record<string, ModelCapabilities> | undefined =
     modelsData?.capabilities ?? modelsData;
   const dynamicModels: ChatModel[] | undefined = modelsData?.models;
+  const liveModels = lmStudio?.models ?? [];
   const activeModels = dynamicModels ?? chatModels;
 
   const selectedModel =
@@ -812,10 +889,11 @@ function PureModelSelectorCompact({
     <ModelSelector onOpenChange={setOpen} open={open}>
       <ModelSelectorTrigger asChild>
         <Button
-          className="h-7 max-w-[200px] justify-between gap-1.5 rounded-lg px-2 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+          className="h-7 max-w-[220px] justify-between gap-1.5 rounded-lg px-2 text-[12px] text-muted-foreground transition-colors hover:text-foreground"
           data-testid="model-selector"
           variant="ghost"
         >
+          <ConnectionStatusDot status={lmStudio?.status} />
           {provider ? <ModelSelectorLogo provider={provider} /> : null}
           <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
         </Button>
@@ -824,13 +902,22 @@ function PureModelSelectorCompact({
         <ModelSelectorInput placeholder="Search models..." />
         <ModelSelectorList>
           {(() => {
-            const curatedIds = new Set(chatModels.map((m) => m.id));
-            const allModels = dynamicModels
+            const curatedIds = new Set([
+              ...chatModels.map((m) => m.id),
+              ...liveModels.map((m) => m.id),
+            ]);
+            const catalog = dynamicModels
               ? [
                   ...chatModels,
                   ...dynamicModels.filter((m) => !curatedIds.has(m.id)),
                 ]
               : chatModels;
+            const allModels = [
+              ...catalog,
+              ...liveModels.filter(
+                (model) => !catalog.some((item) => item.id === model.id)
+              ),
+            ];
 
             const grouped: Record<
               string,
