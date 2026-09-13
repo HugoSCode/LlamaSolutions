@@ -38,7 +38,7 @@
   - Model picker stays in the composer; a status dot probes LM Studio every 20s.
   - Export the current chat as Markdown or JSON (header and sidebar menu).
   - Rename chats from the sidebar `...` menu (inline, Enter/Esc).
-  - **本地无痕模式 / 云端同步模式** segmented control in the header (saved as `llama.sync-mode`). Local mode stores chats only in IndexedDB (`llama-local` / `chats`) and does **not** write chats, votes, uploads, or history deletes to Neon. Cloud mode keeps the existing Neon path. Model/status GETs still go to the server so LM Studio can run.
+  - **Local incognito / Cloud sync** segmented control in the header (saved as `llama.sync-mode`). Local mode stores chats only in IndexedDB (`llama-local` / `chats`) and does **not** write chats, votes, uploads, or history deletes to Neon. Cloud mode keeps the existing Neon path. Model/status GETs still go to the server so LM Studio can run.
 
 ## Model Providers
 

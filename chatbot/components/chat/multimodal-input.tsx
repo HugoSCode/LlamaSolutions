@@ -833,10 +833,10 @@ function ConnectionStatusDot({
 }) {
   const label =
     status === "healthy"
-      ? "LM Studio 已连接"
+      ? "LM Studio connected"
       : status === "impacted"
-        ? "LM Studio 不可用"
-        : "正在检测 LM Studio";
+        ? "LM Studio unavailable"
+        : "Checking LM Studio";
 
   return (
     <span

@@ -43,7 +43,7 @@ export function VoiceInputButton({
       event.preventDefault();
 
       if (!supported) {
-        toast.error("当前浏览器不支持语音输入");
+        toast.error("Voice input is not supported in this browser");
         return;
       }
 
@@ -55,7 +55,7 @@ export function VoiceInputButton({
       prefixRef.current = committedRef.current;
       const started = start();
       if (!started) {
-        toast.error("当前浏览器不支持语音输入");
+        toast.error("Voice input is not supported in this browser");
       }
     },
     [listening, start, stop, supported]
@@ -63,7 +63,7 @@ export function VoiceInputButton({
 
   return (
     <Button
-      aria-label={listening ? "停止语音输入" : "语音输入"}
+      aria-label={listening ? "Stop voice input" : "Voice input"}
       className={cn(
         "h-7 w-7 rounded-lg border border-border/40 p-1 transition-colors",
         listening

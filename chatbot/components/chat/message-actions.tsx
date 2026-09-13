@@ -57,12 +57,12 @@ export function PureMessageActions({
     }
 
     if (!supported) {
-      toast.error("当前浏览器不支持语音播报");
+      toast.error("Voice playback is not supported in this browser");
       return;
     }
 
     if (!textFromParts) {
-      toast.error("这条回复没有可朗读的文本");
+      toast.error("This reply has no text to read");
       return;
     }
 
@@ -211,7 +211,7 @@ export function PureMessageActions({
         className="text-muted-foreground/50 hover:text-foreground"
         data-testid="message-speak"
         onClick={handleSpeak}
-        tooltip={isSpeakingThis ? "停止播报" : "朗读回复"}
+        tooltip={isSpeakingThis ? "Stop speaking" : "Read aloud"}
       >
         {isSpeakingThis ? (
           <SquareIcon className="size-3.5" />

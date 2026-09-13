@@ -46,7 +46,7 @@ export function SyncModeToggle({
       }
 
       if (next === "cloud" && !canUseCloud) {
-        toast.error("登录后才能使用云端同步模式");
+        toast.error("Sign in to use Cloud sync");
         return;
       }
 
@@ -90,11 +90,11 @@ export function SyncModeToggle({
       refreshStores();
       toast.success(
         pendingMode === "local"
-          ? "已复制当前对话到本地无痕模式"
-          : "已复制当前对话到云端同步模式"
+          ? "Copied the current chat to Local incognito"
+          : "Copied the current chat to Cloud sync"
       );
     } catch {
-      toast.error("复制当前对话失败");
+      toast.error("Failed to copy the current chat");
     }
   }, [chatId, messages, pendingMode, refreshStores, setSyncMode, title]);
 
@@ -108,7 +108,9 @@ export function SyncModeToggle({
     refreshStores();
     router.replace("/");
     toast.success(
-      pendingMode === "local" ? "已切换到本地无痕模式" : "已切换到云端同步模式"
+      pendingMode === "local"
+        ? "Switched to Local incognito"
+        : "Switched to Cloud sync"
     );
   }, [pendingMode, refreshStores, router, setSyncMode]);
 
@@ -126,7 +128,7 @@ export function SyncModeToggle({
         className="m-0 inline-flex min-w-0 rounded-lg border border-sidebar-border bg-sidebar-accent/30 p-0.5"
         data-testid="sync-mode-toggle"
       >
-        <legend className="sr-only">同步模式</legend>
+        <legend className="sr-only">Sync mode</legend>
         <button
           aria-pressed={syncMode === "local"}
           className={cn(
@@ -139,7 +141,7 @@ export function SyncModeToggle({
           onClick={handleSelectLocal}
           type="button"
         >
-          本地无痕模式
+          Local incognito
         </button>
         <button
           aria-pressed={syncMode === "cloud"}
@@ -153,7 +155,7 @@ export function SyncModeToggle({
           onClick={handleSelectCloud}
           type="button"
         >
-          云端同步模式
+          Cloud sync
         </button>
       </fieldset>
 
@@ -163,19 +165,20 @@ export function SyncModeToggle({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>切换同步模式？</AlertDialogTitle>
+            <AlertDialogTitle>Switch sync mode?</AlertDialogTitle>
             <AlertDialogDescription>
-              本地无痕与云端记录互不混合。请选择如何处理当前对话。
+              Local and cloud chats are kept separate. Choose how to handle the
+              current conversation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-col">
             <AlertDialogAction onClick={handleCopyCurrent}>
-              复制当前对话
+              Copy current chat
             </AlertDialogAction>
             <AlertDialogAction onClick={handleLeaveBehind}>
-              留在原处
+              Leave behind
             </AlertDialogAction>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

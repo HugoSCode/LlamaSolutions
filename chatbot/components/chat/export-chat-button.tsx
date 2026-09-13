@@ -32,9 +32,11 @@ export function ExportChatButton({
           format,
           isLocal,
         });
-        toast.success(format === "json" ? "已导出 JSON" : "已导出 Markdown");
+        toast.success(
+          format === "json" ? "Exported JSON" : "Exported Markdown"
+        );
       } catch {
-        toast.error("导出失败");
+        toast.error("Export failed");
       }
     },
     [chatId, fallback, isLocal]
@@ -58,15 +60,15 @@ export function ExportChatButton({
           variant="ghost"
         >
           <DownloadIcon className="size-3.5" />
-          导出
+          Export
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem className="cursor-pointer" onSelect={handleMarkdown}>
-          导出 Markdown
+          Export Markdown
         </DropdownMenuItem>
         <DropdownMenuItem className="cursor-pointer" onSelect={handleJson}>
-          导出 JSON
+          Export JSON
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

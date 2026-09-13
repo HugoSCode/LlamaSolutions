@@ -127,7 +127,7 @@ const PureChatItem = ({
       });
       onRenamed(chat.id, saved);
     } catch {
-      toast.error("重命名失败");
+      toast.error("Rename failed");
       cancelRename();
     }
   }, [cancelRename, chat.id, chat.title, draft, isLocal, onRenamed]);
@@ -153,7 +153,7 @@ const PureChatItem = ({
       format: "markdown",
       isLocal,
     }).catch(() => {
-      toast.error("导出失败");
+      toast.error("Export failed");
     });
   }, [chat.id, currentExport, isLocal]);
 
@@ -164,7 +164,7 @@ const PureChatItem = ({
       format: "json",
       isLocal,
     }).catch(() => {
-      toast.error("导出失败");
+      toast.error("Export failed");
     });
   }, [chat.id, currentExport, isLocal]);
 

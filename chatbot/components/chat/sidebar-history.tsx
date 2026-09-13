@@ -131,7 +131,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
           );
 
       if (!knownIds.includes(chatIdToRename)) {
-        toast("发送一条消息后再重命名");
+        toast("Send a message before renaming");
         return;
       }
 
