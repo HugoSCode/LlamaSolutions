@@ -21,6 +21,7 @@ After you sign in, you get:
 - **Local incognito vs Cloud sync** — header toggle
   - **Cloud sync** (default): chats are written to Neon
   - **Local incognito**: chats stay in this browser (IndexedDB); the server still talks to LM Studio but **skips Neon writes**
+- **Live web search** — news, stock prices, weather, and Google-style lookups via [Serper](https://serper.dev) (needs `SERPER_API_KEY` in `.env.local`)
 
 ---
 
@@ -49,9 +50,33 @@ On macOS / Linux:
 cp .env.example .env.local
 ```
 
-`.env.example` already documents the Neon, Auth.js, and LM Studio variables. **Do not commit `.env.local`.** Do not paste real passwords or connection strings into Slack, email, or this README.
+`.env.example` already documents the Neon, Auth.js, LM Studio, and Serper variables. **Do not commit `.env.local`.** Do not paste real passwords, connection strings, or API keys into Slack, email, or this README.
 
 If you already have a teammate’s working `.env.local`, copy that file locally instead of inventing values.
+
+### Live web search (Serper)
+
+The chatbot can look up **latest news**, a **stock price**, **weather** (Open-Meteo, or Serper when you ask in natural language), and general **website / Google-style search**.
+
+1. Create a free account at [https://serper.dev](https://serper.dev) and copy the API key from the dashboard.
+2. In `chatbot/.env.local`, set:
+
+```bash
+SERPER_API_KEY=paste_your_key_here
+```
+
+3. Restart `pnpm dev` (or `npx.cmd --yes pnpm@10.32.1 dev`) so Next.js picks up the new env var.
+
+If the key is missing, chat still works; the search tools return a plain-English error telling you to set `SERPER_API_KEY` in `.env.local`. They do not crash the app.
+
+Try these prompts after sign-in:
+
+- `What's the latest news about NVIDIA?`
+- `AAPL stock price`
+- `weather in Dunedin`
+- `what's on https://www.otago.ac.nz`
+
+Search results include titles, snippets, and links. The model should call tools instead of inventing live facts.
 
 ### 3. Point LM Studio at the right host
 
@@ -101,6 +126,7 @@ The GitHub website cannot talk to `10.118.0.111`. You have to run `pnpm dev` (or
 6. **Rename** — sidebar chat row → **`…`** → **Rename**.
 7. **New chat / Delete all** — sidebar **New chat**, or **Delete All Chats** (with confirm).
 8. **Local incognito** — switch the header toggle. New replies stay in this browser and are **not** written to Neon. **Cloud sync** writes chats to the database again.
+9. **Live search** — ask for NVIDIA news, `AAPL stock price`, or weather in Dunedin. You should see a search/news tool card with titles, snippets, and links (or a message to set `SERPER_API_KEY` if the key is missing).
 
 ---
 
