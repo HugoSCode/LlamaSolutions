@@ -40,11 +40,15 @@ import {
 } from "@/components/ai-elements/model-selector";
 import { requestChatRename } from "@/hooks/use-rename-request";
 import { useSyncMode } from "@/hooks/use-sync-mode";
-import type { LmStudioProbeResult } from "@/lib/ai/lmstudio";
+import type {
+  LmStudioProbeResult,
+  ModelRuntimeProvider,
+} from "@/lib/ai/lmstudio";
 import {
   type ChatModel,
-  chatModels,
   DEFAULT_CHAT_MODEL,
+  gatewayChatModels,
+  lmStudioChatModels,
   type ModelCapabilities,
 } from "@/lib/ai/models";
 import {
@@ -826,17 +830,34 @@ function ModelSelectorOption({
   );
 }
 
+function getConnectionLabel(
+  provider: ModelRuntimeProvider | undefined,
+  status: LmStudioProbeResult["status"] | undefined
+) {
+  let service = "model provider";
+  if (provider === "gateway") {
+    service = "AI Gateway";
+  } else if (provider === "lmstudio") {
+    service = "LM Studio";
+  }
+
+  if (status === "healthy") {
+    return `${service} connected`;
+  }
+  if (status === "impacted") {
+    return `${service} unavailable`;
+  }
+  return `Checking ${service}`;
+}
+
 function ConnectionStatusDot({
+  provider,
   status,
 }: {
+  provider: ModelRuntimeProvider | undefined;
   status: LmStudioProbeResult["status"] | undefined;
 }) {
-  const label =
-    status === "healthy"
-      ? "LM Studio connected"
-      : status === "impacted"
-        ? "LM Studio unavailable"
-        : "Checking LM Studio";
+  const label = getConnectionLabel(provider, status);
 
   return (
     <span
@@ -874,16 +895,21 @@ function PureModelSelectorCompact({
   );
 
   const capabilities: Record<string, ModelCapabilities> | undefined =
-    modelsData?.capabilities ?? modelsData;
+    modelsData?.capabilities;
   const dynamicModels: ChatModel[] | undefined = modelsData?.models;
-  const liveModels = lmStudio?.models ?? [];
-  const activeModels = dynamicModels ?? chatModels;
+  const runtimeProvider: ModelRuntimeProvider | undefined =
+    modelsData?.provider ?? lmStudio?.provider;
+  const liveModels =
+    runtimeProvider === "gateway" ? [] : (lmStudio?.models ?? []);
+  const fallbackModels =
+    runtimeProvider === "gateway" ? gatewayChatModels : lmStudioChatModels;
+  const curatedModels = dynamicModels ?? fallbackModels;
 
   const selectedModel =
-    activeModels.find((m: ChatModel) => m.id === selectedModelId) ??
-    activeModels.find((m: ChatModel) => m.id === DEFAULT_CHAT_MODEL) ??
-    activeModels[0];
-  const [provider] = selectedModel.id.split("/");
+    curatedModels.find((m: ChatModel) => m.id === selectedModelId) ??
+    curatedModels.find((m: ChatModel) => m.id === DEFAULT_CHAT_MODEL) ??
+    curatedModels[0];
+  const [provider] = selectedModel?.id.split("/") ?? [];
 
   return (
     <ModelSelector onOpenChange={setOpen} open={open}>
@@ -893,25 +919,27 @@ function PureModelSelectorCompact({
           data-testid="model-selector"
           variant="ghost"
         >
-          <ConnectionStatusDot status={lmStudio?.status} />
+          <ConnectionStatusDot
+            provider={runtimeProvider}
+            status={
+              runtimeProvider === "gateway" ? "healthy" : lmStudio?.status
+            }
+          />
           {provider ? <ModelSelectorLogo provider={provider} /> : null}
-          <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
+          <ModelSelectorName>
+            {selectedModel?.name ?? "Select model"}
+          </ModelSelectorName>
         </Button>
       </ModelSelectorTrigger>
-      <ModelSelectorContent commandDefaultValue={selectedModel.id}>
+      <ModelSelectorContent commandDefaultValue={selectedModel?.id}>
         <ModelSelectorInput placeholder="Search models..." />
         <ModelSelectorList>
           {(() => {
             const curatedIds = new Set([
-              ...chatModels.map((m) => m.id),
+              ...curatedModels.map((m) => m.id),
               ...liveModels.map((m) => m.id),
             ]);
-            const catalog = dynamicModels
-              ? [
-                  ...chatModels,
-                  ...dynamicModels.filter((m) => !curatedIds.has(m.id)),
-                ]
-              : chatModels;
+            const catalog = curatedModels;
             const allModels = [
               ...catalog,
               ...liveModels.filter(
@@ -984,7 +1012,7 @@ function PureModelSelectorCompact({
                     key={model.id}
                     model={model}
                     onModelChange={onModelChange}
-                    selectedModelId={selectedModel.id}
+                    selectedModelId={selectedModel?.id ?? selectedModelId}
                     setOpen={setOpen}
                   />
                 ))}

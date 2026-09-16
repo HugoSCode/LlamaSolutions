@@ -17,7 +17,7 @@
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
     "test": "export PLAYWRIGHT=True && pnpm exec playwright test",
-    "test:unit": "tsx --test lib/export-chat.test.ts lib/ai/tools/serper.test.ts"
+    "test:unit": "tsx --test lib/export-chat.test.ts lib/ai/tools/serper.test.ts lib/ai/runtime.test.ts lib/ai/models-routing.test.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.44",

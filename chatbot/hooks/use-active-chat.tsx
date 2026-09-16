@@ -22,7 +22,7 @@ import { toast } from "@/components/chat/toast";
 import type { VisibilityType } from "@/components/chat/visibility-selector";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useSyncMode } from "@/hooks/use-sync-mode";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
+import { type ChatModel, DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
 import { getChatHistoryPaginationKey } from "@/lib/chat-history";
 import type { Vote } from "@/lib/db/schema";
 import { ChatbotError } from "@/lib/errors";
@@ -264,17 +264,38 @@ export function ActiveChatProvider({ children }: { children: ReactNode }) {
     }
   }, [chatData?.title, isLocal, isNewChat, localChat?.title]);
 
+  const { data: modelsCatalog } = useSWR<{
+    defaultModel?: string;
+    models?: ChatModel[];
+  }>(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/models`, fetcher, {
+    revalidateOnFocus: false,
+  });
+
   useEffect(() => {
-    if ((chatData || localChat) && !isNewChat) {
-      const cookieModel = document.cookie
-        .split("; ")
-        .find((row) => row.startsWith("chat-model="))
-        ?.split("=")[1];
-      if (cookieModel) {
-        setCurrentModelId(decodeURIComponent(cookieModel));
-      }
+    const available = modelsCatalog?.models;
+    if (!available || available.length === 0) {
+      return;
     }
-  }, [chatData, isNewChat, localChat]);
+
+    const allowedIds = new Set(available.map((model) => model.id));
+    const cookieModel = document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("chat-model="))
+      ?.split("=")[1];
+    const decodedCookie = cookieModel
+      ? decodeURIComponent(cookieModel)
+      : undefined;
+
+    setCurrentModelId((current) => {
+      if (decodedCookie && allowedIds.has(decodedCookie)) {
+        return decodedCookie;
+      }
+      if (allowedIds.has(current)) {
+        return current;
+      }
+      return modelsCatalog?.defaultModel ?? available[0]?.id ?? current;
+    });
+  }, [modelsCatalog]);
 
   const hasAppendedQueryRef = useRef(false);
   useEffect(() => {

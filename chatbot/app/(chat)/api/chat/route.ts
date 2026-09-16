@@ -14,10 +14,10 @@ import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
-  chatModels,
-  DEFAULT_CHAT_MODEL,
+  getActiveModels,
   getCapabilities,
   getModelAvailability,
+  resolveChatModel,
 } from "@/lib/ai/models";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { getLanguageModel } from "@/lib/ai/providers";
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       return new ChatbotError("unauthorized:chat").toResponse();
     }
 
-    const chatModel = selectedChatModel || DEFAULT_CHAT_MODEL;
+    const chatModel = resolveChatModel(selectedChatModel);
 
     await checkIpRateLimit(ipAddress(request));
 
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const modelConfig = chatModels.find((m) => m.id === chatModel);
+    const modelConfig = getActiveModels().find((m) => m.id === chatModel);
     const modelCapabilities = await getCapabilities();
     const capabilities = modelCapabilities[chatModel];
     const isReasoningModel = capabilities?.reasoning === true;

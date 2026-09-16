@@ -2,9 +2,12 @@ import type { ChatModel } from "./models";
 
 export type LmStudioStatus = "healthy" | "impacted" | "unknown";
 
+export type ModelRuntimeProvider = "gateway" | "lmstudio";
+
 export type LmStudioProbeResult = {
   status: LmStudioStatus;
   models: ChatModel[];
+  provider?: ModelRuntimeProvider;
 };
 
 const DEFAULT_LMSTUDIO_BASE_URL = "http://localhost:1234/v1";
