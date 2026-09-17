@@ -29,6 +29,18 @@ export const chatModels: ChatModel[] = [
     name: "Qwen3 VL 4B",
     provider: "lmstudio",
   },
+  {
+    description: "Local GPT-OSS 20B model with reasoning and tool use",
+    id: "openai/gpt-oss-20b",
+    name: "GPT-OSS 20B",
+    provider: "lmstudio",
+  },
+  {
+    description: "Local Qwen2.5 VL 7B model with vision",
+    id: "qwen/qwen2.5-vl-7b",
+    name: "Qwen2.5 VL 7B",
+    provider: "lmstudio",
+  },
 ];
  
 export const isDemo = process.env.IS_DEMO === "5";
@@ -63,6 +75,16 @@ export async function getCapabilities(): Promise<
 > {
   return {
     "qwen/qwen3-vl-4b": {
+      tools: true,
+      vision: true,
+      reasoning: true,
+    },
+    "qwen/qwen2.5-vl-7b": {
+      tools: true,
+      vision: true,
+      reasoning: true,
+    },
+     "openai/gpt-oss-20b": {
       tools: true,
       vision: true,
       reasoning: true,
