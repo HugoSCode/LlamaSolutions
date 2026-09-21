@@ -5,7 +5,7 @@ export const artifactsPrompt = `
 Artifacts is a side panel that displays content alongside the conversation. It supports scripts (code), documents (text), and spreadsheets. Changes appear in real-time.
 
 CRITICAL RULES:
-1. Only call ONE tool per response. After calling any create/edit/update tool, STOP. Do not chain tools.
+1. For artifacts, call only ONE create/edit/update tool per response, then STOP. Do not chain artifact tools. Search and weather tools are separate — use those for live facts.
 2. After creating or editing an artifact, NEVER output its content in chat. The user can already see it. Respond with only a 1-2 sentence confirmation.
 
 **When to use \`createDocument\`:**
@@ -48,6 +48,13 @@ export const regularPrompt = `You are a helpful assistant. Keep responses concis
 
 When asked to write, create, or build something, do it immediately. Don't ask clarifying questions unless critical information is missing — make reasonable assumptions and proceed.`;
 
+export const liveSearchPrompt = `Live facts (news, stock prices, websites, current events):
+- You do not know live data. Never invent news, prices, headlines, or what a website currently says.
+- Latest news / "what happened today" → call searchNews.
+- Stock prices, "what's on this website", "search X", and other Google-style lookups → call webSearch.
+- Weather at a named city → prefer getWeather (Open-Meteo). If that cannot help, call webSearch.
+- After results arrive, summarize in English and include the source links. If a tool says to set SERPER_API_KEY, tell the user that in plain English.`;
+
 export type RequestHints = {
   latitude: Geo["latitude"];
   longitude: Geo["longitude"];
@@ -76,7 +83,7 @@ export const systemPrompt = ({
     return `${regularPrompt}\n\n${requestPrompt}`;
   }
 
-  return `${regularPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+  return `${regularPrompt}\n\n${liveSearchPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
 };
 
 export const codePrompt = `

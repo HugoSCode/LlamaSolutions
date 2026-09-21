@@ -1,15 +1,16 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { customProvider } from "ai";
+import { customProvider, gateway } from "ai";
 
 import { isTestEnvironment } from "../constants";
 
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { getLmStudioBaseUrl } from "./lmstudio";
+import { getTitleModelConfig, resolveModelRuntime } from "./models";
+import { isAiGatewayEnabled } from "./runtime";
 
-function normalizeOpenAIModelId(modelId: string) {
-  return modelId.replace(/^openai\//, "");
-}
+const lmstudio = createOpenAI({
+  apiKey: process.env.LMSTUDIO_API_KEY || "lm-studio",
+  baseURL: getLmStudioBaseUrl(),
+});
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -29,10 +30,14 @@ export const myProvider = isTestEnvironment
 
 export function getLanguageModel(modelId: string) {
   if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel(modelId);
+    return myProvider.languageModel("chat-model");
   }
 
-  return openai(normalizeOpenAIModelId(modelId));
+  if (resolveModelRuntime(modelId) === "lmstudio") {
+    return lmstudio.chat(modelId);
+  }
+
+  return gateway.languageModel(modelId);
 }
 
 export function getTitleModel() {
@@ -40,5 +45,9 @@ export function getTitleModel() {
     return myProvider.languageModel("title-model");
   }
 
-  return openai("gpt-4o-mini");
+  if (isAiGatewayEnabled()) {
+    return gateway.languageModel(getTitleModelConfig().id);
+  }
+
+  return lmstudio.chat(process.env.LMSTUDIO_MODEL || getTitleModelConfig().id);
 }

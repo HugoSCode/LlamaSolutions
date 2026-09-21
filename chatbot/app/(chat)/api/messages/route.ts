@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     return Response.json({
       isReadonly: false,
       messages: [],
+      title: "New chat",
       userId: null,
       visibility: "private",
     });
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
   return Response.json({
     isReadonly,
     messages: convertToUIMessages(messages),
+    title: chat.title,
     userId: chat.userId,
     visibility: chat.visibility,
   });

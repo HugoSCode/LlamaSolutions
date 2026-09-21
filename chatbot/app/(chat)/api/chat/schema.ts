@@ -9,7 +9,7 @@ const filePartSchema = z.object({
   mediaType: z.enum(["image/jpeg", "image/png"]),
   name: z.string().min(1).max(100),
   type: z.enum(["file"]),
-  url: z.url(),
+  url: z.string().min(1),
 });
 
 const partSchema = z.union([textPartSchema, filePartSchema]);
@@ -30,6 +30,7 @@ export const postRequestBodySchema = z.object({
   id: z.uuid(),
   message: userMessageSchema.optional(),
   messages: z.array(toolApprovalMessageSchema).optional(),
+  persist: z.boolean().optional().default(true),
   selectedChatModel: z.string(),
   selectedVisibilityType: z.enum(["public", "private"]),
 });

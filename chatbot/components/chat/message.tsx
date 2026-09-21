@@ -20,6 +20,11 @@ import { SparklesIcon } from "./icons";
 import { MessageActions } from "./message-actions";
 import { MessageReasoning } from "./message-reasoning";
 import { PreviewAttachment } from "./preview-attachment";
+import {
+  isSearchToolType,
+  SearchToolView,
+  type SearchToolViewPart,
+} from "./search-results";
 import { Weather } from "./weather";
 
 function WaitingText() {
@@ -186,6 +191,10 @@ const PurePreviewMessage = ({
           <MessageResponse>{sanitizeText(part.text)}</MessageResponse>
         </MessageContent>
       );
+    }
+
+    if (isSearchToolType(part.type)) {
+      return <SearchToolView key={key} part={part as SearchToolViewPart} />;
     }
 
     if (type === "tool-getWeather") {

@@ -14,20 +14,19 @@ import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
-  allowedModelIds,
-  chatModels,
-  DEFAULT_CHAT_MODEL,
+  getActiveModels,
   getCapabilities,
   getModelAvailability,
+  resolveChatModel,
 } from "@/lib/ai/models";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
 import { getLanguageModel } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { editDocument } from "@/lib/ai/tools/edit-document";
 import { getWeather } from "@/lib/ai/tools/get-weather";
-import { webSearch } from "@/lib/ai/tools/web-search";
 import { requestSuggestions } from "@/lib/ai/tools/request-suggestions";
 import { updateDocument } from "@/lib/ai/tools/update-document";
+import { searchNews, webSearch } from "@/lib/ai/tools/web-search";
 import { isProductionEnvironment } from "@/lib/constants";
 import {
   createStreamId,
@@ -79,8 +78,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
-      requestBody;
+    const {
+      id,
+      message,
+      messages,
+      persist = true,
+      selectedChatModel,
+      selectedVisibilityType,
+    } = requestBody;
 
     const [botIdResult, session] = await Promise.all([
       checkBotId().catch(() => null),
@@ -95,47 +100,68 @@ export async function POST(request: Request) {
       return new ChatbotError("unauthorized:chat").toResponse();
     }
 
-    const chatModel = allowedModelIds.has(selectedChatModel)
-      ? selectedChatModel
-      : DEFAULT_CHAT_MODEL;
+    const chatModel = resolveChatModel(selectedChatModel);
 
     await checkIpRateLimit(ipAddress(request));
 
     const userType: UserType = session.user.type;
 
-    const messageCount = await getMessageCountByUserId({
-      differenceInHours: 1,
-      id: session.user.id,
-    });
+    if (persist) {
+      const messageCount = await getMessageCountByUserId({
+        differenceInHours: 1,
+        id: session.user.id,
+      });
 
-    if (messageCount > entitlementsByUserType[userType].maxMessagesPerHour) {
-      return new ChatbotError("rate_limit:chat").toResponse();
+      if (messageCount > entitlementsByUserType[userType].maxMessagesPerHour) {
+        return new ChatbotError("rate_limit:chat").toResponse();
+      }
     }
 
-    const isToolApprovalFlow = Boolean(messages);
+    const isToolApprovalFlow = persist
+      ? Boolean(messages)
+      : Boolean(
+          messages?.some((msg) =>
+            msg.parts?.some((part) => {
+              const { state } = part as { state?: string };
+              return (
+                state === "approval-responded" || state === "output-denied"
+              );
+            })
+          )
+        );
 
-    const chat = await getChatById({ id });
+    const chat = persist ? await getChatById({ id }) : null;
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
 
-    if (chat) {
-      if (chat.userId !== session.user.id) {
-        return new ChatbotError("forbidden:chat").toResponse();
+    if (persist) {
+      if (chat) {
+        if (chat.userId !== session.user.id) {
+          return new ChatbotError("forbidden:chat").toResponse();
+        }
+        messagesFromDb = await getMessagesByChatId({ id });
+      } else if (message?.role === "user") {
+        await saveChat({
+          id,
+          title: "New chat",
+          userId: session.user.id,
+          visibility: selectedVisibilityType,
+        });
+        titlePromise = generateTitleFromUserMessage({ message });
       }
-      messagesFromDb = await getMessagesByChatId({ id });
     } else if (message?.role === "user") {
-      await saveChat({
-        id,
-        title: "New chat",
-        userId: session.user.id,
-        visibility: selectedVisibilityType,
-      });
-      titlePromise = generateTitleFromUserMessage({ message });
+      const userMessageCount =
+        messages?.filter((item) => item.role === "user").length ?? 1;
+      if (userMessageCount <= 1) {
+        titlePromise = generateTitleFromUserMessage({ message });
+      }
     }
 
     let uiMessages: ChatMessage[];
 
-    if (isToolApprovalFlow && messages) {
+    if (!persist) {
+      uiMessages = (messages ?? (message ? [message] : [])) as ChatMessage[];
+    } else if (isToolApprovalFlow && messages) {
       const dbMessages = convertToUIMessages(messagesFromDb);
       const approvalStates = new Map(
         messages.flatMap(
@@ -180,7 +206,7 @@ export async function POST(request: Request) {
       longitude,
     };
 
-    if (message?.role === "user") {
+    if (persist && message?.role === "user") {
       await saveMessages({
         messages: [
           {
@@ -195,7 +221,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const modelConfig = chatModels.find((m) => m.id === chatModel);
+    const modelConfig = getActiveModels().find((m) => m.id === chatModel);
     const modelCapabilities = await getCapabilities();
     const capabilities = modelCapabilities[chatModel];
     const isReasoningModel = capabilities?.reasoning === true;
@@ -273,12 +299,12 @@ export async function POST(request: Request) {
               ? []
               : [
                   "getWeather",
+                  "webSearch",
+                  "searchNews",
                   "createDocument",
                   "editDocument",
                   "updateDocument",
                   "requestSuggestions",
-                  "webSearch",
-
                 ],
           instructions: systemPrompt({ requestHints, supportsTools }),
           messages: modelMessages,
@@ -323,6 +349,7 @@ export async function POST(request: Request) {
               modelId: chatModel,
               session,
             }),
+            searchNews,
             updateDocument: updateDocument({
               dataStream,
               modelId: chatModel,
@@ -343,7 +370,9 @@ export async function POST(request: Request) {
           try {
             const title = await titlePromise;
             dataStream.write({ data: title, type: "data-chat-title" });
-            updateChatTitleById({ chatId: id, title });
+            if (persist) {
+              updateChatTitleById({ chatId: id, title });
+            }
           } catch {
             /* non-fatal */
           }
@@ -351,6 +380,10 @@ export async function POST(request: Request) {
       },
       generateId: generateUUID,
       onEnd: async ({ messages: finishedMessages }) => {
+        if (!persist) {
+          return;
+        }
+
         if (isToolApprovalFlow) {
           await Promise.all(
             finishedMessages.map(async (finishedMsg) => {
@@ -408,7 +441,7 @@ export async function POST(request: Request) {
 
     return createUIMessageStreamResponse({
       async consumeSseStream({ stream: sseStream }) {
-        if (!process.env.REDIS_URL) {
+        if (!persist || !process.env.REDIS_URL) {
           return;
         }
         try {
