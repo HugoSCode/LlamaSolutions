@@ -1,15 +1,14 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { customProvider } from "ai";
+import { customProvider, gateway } from "ai";
 
 import { isTestEnvironment } from "../constants";
 
-const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { titleModel } from "./models";
 
-function normalizeOpenAIModelId(modelId: string) {
-  return modelId.replace(/^openai\//, "");
-}
+const lmstudio = createOpenAI({
+  baseURL: process.env.LMSTUDIO_BASE_URL || "http://localhost:1234/v1",
+  apiKey: process.env.LMSTUDIO_API_KEY || "lm-studio",
+});
 
 export const myProvider = isTestEnvironment
   ? (() => {
@@ -32,7 +31,7 @@ export function getLanguageModel(modelId: string) {
     return myProvider.languageModel(modelId);
   }
 
-  return openai(normalizeOpenAIModelId(modelId));
+  return lmstudio.chat(modelId);
 }
 
 export function getTitleModel() {
@@ -40,5 +39,5 @@ export function getTitleModel() {
     return myProvider.languageModel("title-model");
   }
 
-  return openai("gpt-4o-mini");
+  return lmstudio.chat(process.env.LMSTUDIO_MODEL || "your-model-id");
 }
