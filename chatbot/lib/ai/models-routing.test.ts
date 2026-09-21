@@ -20,6 +20,7 @@ describe("getActiveModels", () => {
     const models = getActiveModels(vercel);
     assert.ok(models.some((model) => model.id === GATEWAY_DEFAULT_CHAT_MODEL));
     assert.ok(models.some((model) => model.id === "deepseek/deepseek-v3.2"));
+    assert.ok(models.some((model) => model.id === "openai/gpt-4o"));
     assert.equal(
       models.some((model) => model.id === LMSTUDIO_DEFAULT_CHAT_MODEL),
       false
@@ -77,6 +78,7 @@ describe("resolveChatModel", () => {
       resolveChatModel("deepseek/deepseek-v3.2", vercel),
       "deepseek/deepseek-v3.2"
     );
+    assert.equal(resolveChatModel("openai/gpt-4o", vercel), "openai/gpt-4o");
   });
 
   it("allows extra LM Studio ids locally", () => {

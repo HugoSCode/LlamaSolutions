@@ -83,6 +83,13 @@ export const gatewayChatModels: ChatModel[] = [
     name: "Grok 4.1 Fast",
     provider: "xai",
   },
+  {
+    description: "OpenAI flagship model with vision, reasoning, and tool use",
+    gatewayOrder: ["openai"],
+    id: "openai/gpt-4o",
+    name: "GPT-4o",
+    provider: "openai",
+  },
 ];
 
 export const lmStudioChatModels: ChatModel[] = [
@@ -102,6 +109,11 @@ const GATEWAY_MODEL_CAPABILITIES: Record<string, ModelCapabilities> = {
     vision: false,
   },
   [GATEWAY_DEFAULT_CHAT_MODEL]: {
+    reasoning: true,
+    tools: true,
+    vision: true,
+  },
+  "openai/gpt-4o": {
     reasoning: true,
     tools: true,
     vision: true,
