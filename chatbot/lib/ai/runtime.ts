@@ -14,6 +14,17 @@ export function hasAiGatewayApiKey(
   return true;
 }
 
+/** True only on Vercel-hosted deploys. School LM Studio is unreachable from there. */
+export function isOnVercel(env: EnvLike = process.env): boolean {
+  return Boolean(env.VERCEL);
+}
+
+/** Local `pnpm dev` (and other non-Vercel hosts) can talk to LM Studio. */
+export function canUseLmStudio(env: EnvLike = process.env): boolean {
+  return !isOnVercel(env);
+}
+
+/** Gateway credentials exist (Vercel OIDC, a key, or a Vercel deploy). */
 export function isAiGatewayEnabled(env: EnvLike = process.env): boolean {
   return Boolean(
     env.VERCEL ||
@@ -22,6 +33,7 @@ export function isAiGatewayEnabled(env: EnvLike = process.env): boolean {
   );
 }
 
+/** Default backend when no model id is selected. Not an exclusive lock. */
 export function getAiRuntime(env: EnvLike = process.env): AiRuntime {
   return isAiGatewayEnabled(env) ? "gateway" : "lmstudio";
 }

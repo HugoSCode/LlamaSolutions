@@ -1,5 +1,5 @@
 import { probeLmStudio } from "./lmstudio";
-import { isAiGatewayEnabled } from "./runtime";
+import { type AiRuntime, isAiGatewayEnabled, isOnVercel } from "./runtime";
 
 export const GATEWAY_DEFAULT_CHAT_MODEL = "moonshotai/kimi-k2.5";
 export const LMSTUDIO_DEFAULT_CHAT_MODEL = "qwen/qwen3-vl-4b";
@@ -18,7 +18,7 @@ export const gatewayTitleModel = {
 export const lmStudioTitleModel = {
   description: "Fast local model for title generation",
   id: LMSTUDIO_DEFAULT_CHAT_MODEL,
-  name: "Qwen3 VL 4B",
+  name: "Local / LM Studio",
   provider: "lmstudio",
 };
 
@@ -87,9 +87,10 @@ export const gatewayChatModels: ChatModel[] = [
 
 export const lmStudioChatModels: ChatModel[] = [
   {
-    description: "Local Qwen3 VL 4B model with vision and tool use",
+    description:
+      "Qwen3 VL 4B via LM Studio (school LAN or this computer). Local pnpm dev only.",
     id: LMSTUDIO_DEFAULT_CHAT_MODEL,
-    name: "Qwen3 VL 4B",
+    name: "Local / LM Studio",
     provider: "lmstudio",
   },
 ];
@@ -138,8 +139,50 @@ export type GatewayModelWithCapabilities = ChatModel & {
 
 type EnvLike = Record<string, string | undefined>;
 
+const gatewayModelIds = new Set(gatewayChatModels.map((item) => item.id));
+const lmStudioModelIds = new Set(lmStudioChatModels.map((item) => item.id));
+
+export function isLmStudioModelId(modelId: string | undefined): boolean {
+  return Boolean(modelId && lmStudioModelIds.has(modelId));
+}
+
+/**
+ * Provider for a selected model id. On Vercel always Gateway.
+ * Locally, the id decides Gateway vs LM Studio (both can appear in the picker).
+ */
+export function resolveModelRuntime(
+  modelId: string | undefined,
+  env: EnvLike = process.env
+): AiRuntime {
+  if (isOnVercel(env)) {
+    return "gateway";
+  }
+
+  if (isLmStudioModelId(modelId)) {
+    return "lmstudio";
+  }
+
+  if (modelId && gatewayModelIds.has(modelId) && isAiGatewayEnabled(env)) {
+    return "gateway";
+  }
+
+  if (modelId && !gatewayModelIds.has(modelId)) {
+    return "lmstudio";
+  }
+
+  return isAiGatewayEnabled(env) ? "gateway" : "lmstudio";
+}
+
 export function getActiveModels(env: EnvLike = process.env): ChatModel[] {
-  return isAiGatewayEnabled(env) ? gatewayChatModels : lmStudioChatModels;
+  if (isOnVercel(env)) {
+    return gatewayChatModels;
+  }
+
+  if (isAiGatewayEnabled(env)) {
+    return [...gatewayChatModels, ...lmStudioChatModels];
+  }
+
+  return lmStudioChatModels;
 }
 
 export function getDefaultChatModel(env: EnvLike = process.env): string {
@@ -161,19 +204,12 @@ export function resolveChatModel(
     return modelId;
   }
 
-  const gatewayIds = new Set(gatewayChatModels.map((item) => item.id));
-
-  if (isAiGatewayEnabled(env)) {
-    return getDefaultChatModel(env);
-  }
-
-  // Cookies / client defaults may still hold a Gateway id after switching to local.
-  if (modelId && gatewayIds.has(modelId)) {
+  if (isOnVercel(env)) {
     return getDefaultChatModel(env);
   }
 
   // Local LM Studio can serve any model currently loaded in the lab server.
-  if (modelId) {
+  if (modelId && !gatewayModelIds.has(modelId)) {
     return modelId;
   }
 
@@ -202,25 +238,30 @@ export const modelsByProvider = [
   {} as Record<string, ChatModel[]>
 );
 
+function capabilitiesForModel(model: ChatModel): ModelCapabilities {
+  const table =
+    model.provider === "lmstudio"
+      ? LMSTUDIO_MODEL_CAPABILITIES
+      : GATEWAY_MODEL_CAPABILITIES;
+  return table[model.id] ?? DEFAULT_TOOL_CAPABILITIES;
+}
+
 export async function getCapabilities(
   env: EnvLike = process.env
 ): Promise<Record<string, ModelCapabilities>> {
   const models = getActiveModels(env);
   const defaults = Object.fromEntries(
-    models.map((model) => [
-      model.id,
-      (isAiGatewayEnabled(env)
-        ? GATEWAY_MODEL_CAPABILITIES[model.id]
-        : LMSTUDIO_MODEL_CAPABILITIES[model.id]) ?? DEFAULT_TOOL_CAPABILITIES,
-    ])
+    models.map((model) => [model.id, capabilitiesForModel(model)])
   );
 
-  if (!isAiGatewayEnabled(env)) {
+  const gatewayModels = models.filter((model) => model.provider !== "lmstudio");
+
+  if (gatewayModels.length === 0) {
     return defaults;
   }
 
   const results = await Promise.all(
-    models.map(async (model) => {
+    gatewayModels.map(async (model) => {
       try {
         const res = await fetch(
           `https://ai-gateway.vercel.sh/v1/models/${model.id}/endpoints`,
@@ -294,7 +335,7 @@ export async function getModelAvailability(
   modelId: string,
   env: EnvLike = process.env
 ): Promise<ModelAvailability> {
-  if (!isAiGatewayEnabled(env)) {
+  if (resolveModelRuntime(modelId, env) === "lmstudio") {
     const probe = await probeLmStudio();
 
     if (probe.status !== "healthy") {

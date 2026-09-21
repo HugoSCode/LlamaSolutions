@@ -3,7 +3,7 @@ import {
   getCapabilities,
   getDefaultChatModel,
 } from "@/lib/ai/models";
-import { getAiRuntime } from "@/lib/ai/runtime";
+import { canUseLmStudio, getAiRuntime } from "@/lib/ai/runtime";
 
 export async function GET() {
   const headers = {
@@ -17,6 +17,7 @@ export async function GET() {
     {
       capabilities,
       defaultModel: getDefaultChatModel(),
+      localModelsEnabled: canUseLmStudio(),
       models,
       provider: getAiRuntime(),
     },

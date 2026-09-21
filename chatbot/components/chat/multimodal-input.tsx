@@ -897,19 +897,28 @@ function PureModelSelectorCompact({
   const capabilities: Record<string, ModelCapabilities> | undefined =
     modelsData?.capabilities;
   const dynamicModels: ChatModel[] | undefined = modelsData?.models;
-  const runtimeProvider: ModelRuntimeProvider | undefined =
-    modelsData?.provider ?? lmStudio?.provider;
-  const liveModels =
-    runtimeProvider === "gateway" ? [] : (lmStudio?.models ?? []);
-  const fallbackModels =
-    runtimeProvider === "gateway" ? gatewayChatModels : lmStudioChatModels;
+  const localModelsEnabled = Boolean(
+    modelsData?.localModelsEnabled ?? lmStudio?.provider === "lmstudio"
+  );
+  const liveModels = localModelsEnabled ? (lmStudio?.models ?? []) : [];
+  const fallbackModels = localModelsEnabled
+    ? lmStudioChatModels
+    : gatewayChatModels;
   const curatedModels = dynamicModels ?? fallbackModels;
 
   const selectedModel =
     curatedModels.find((m: ChatModel) => m.id === selectedModelId) ??
+    liveModels.find((m: ChatModel) => m.id === selectedModelId) ??
     curatedModels.find((m: ChatModel) => m.id === DEFAULT_CHAT_MODEL) ??
     curatedModels[0];
   const [provider] = selectedModel?.id.split("/") ?? [];
+  const selectedIsLocal =
+    selectedModel?.provider === "lmstudio" ||
+    lmStudioChatModels.some((model) => model.id === selectedModel?.id);
+  const statusProvider: ModelRuntimeProvider = selectedIsLocal
+    ? "lmstudio"
+    : "gateway";
+  const status = selectedIsLocal ? lmStudio?.status : "healthy";
 
   return (
     <ModelSelector onOpenChange={setOpen} open={open}>
@@ -919,12 +928,7 @@ function PureModelSelectorCompact({
           data-testid="model-selector"
           variant="ghost"
         >
-          <ConnectionStatusDot
-            provider={runtimeProvider}
-            status={
-              runtimeProvider === "gateway" ? "healthy" : lmStudio?.status
-            }
-          />
+          <ConnectionStatusDot provider={statusProvider} status={status} />
           {provider ? <ModelSelectorLogo provider={provider} /> : null}
           <ModelSelectorName>
             {selectedModel?.name ?? "Select model"}

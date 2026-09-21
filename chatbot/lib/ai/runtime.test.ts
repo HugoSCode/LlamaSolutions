@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  canUseLmStudio,
   getAiRuntime,
   hasAiGatewayApiKey,
   isAiGatewayEnabled,
+  isOnVercel,
 } from "./runtime";
 
 describe("hasAiGatewayApiKey", () => {
@@ -46,9 +48,30 @@ describe("isAiGatewayEnabled", () => {
   });
 });
 
+describe("isOnVercel / canUseLmStudio", () => {
+  it("treats only VERCEL as the cloud deploy", () => {
+    assert.equal(isOnVercel({ VERCEL: "1" }), true);
+    assert.equal(canUseLmStudio({ VERCEL: "1" }), false);
+    assert.equal(isOnVercel({ AI_GATEWAY_API_KEY: "vck_live_example" }), false);
+    assert.equal(
+      canUseLmStudio({ AI_GATEWAY_API_KEY: "vck_live_example" }),
+      true
+    );
+    assert.equal(isOnVercel({ VERCEL_OIDC_TOKEN: "oidc-token" }), false);
+    assert.equal(canUseLmStudio({}), true);
+  });
+});
+
 describe("getAiRuntime", () => {
   it("returns gateway on Vercel and lmstudio locally", () => {
     assert.equal(getAiRuntime({ VERCEL: "1" }), "gateway");
     assert.equal(getAiRuntime({}), "lmstudio");
+  });
+
+  it("defaults to gateway locally when a Gateway key exists (picker still includes LM Studio)", () => {
+    assert.equal(
+      getAiRuntime({ AI_GATEWAY_API_KEY: "vck_live_example" }),
+      "gateway"
+    );
   });
 });
