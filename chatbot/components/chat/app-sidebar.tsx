@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  MessageSquareIcon,
   PanelLeftIcon,
   PenSquareIcon,
   TrashIcon,
@@ -92,11 +91,20 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               <div className="group/logo relative flex items-center justify-center">
                 <SidebarMenuButton
                   asChild
-                  className="size-8 !px-0 items-center justify-center group-data-[collapsible=icon]:group-hover/logo:opacity-0"
-                  tooltip="Chatbot"
+                  className="h-10 items-center gap-2.5 rounded-xl px-2 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:px-0! group-data-[collapsible=icon]:group-hover/logo:opacity-0"
+                  tooltip="Otago Polytechnic Assistant"
                 >
                   <Link href="/" onClick={closeMobile}>
-                    <MessageSquareIcon className="size-4 text-sidebar-foreground/50" />
+                    <img
+                      alt="Otago Polytechnic"
+                      className="app-sidebar-logo h-8 w-auto shrink-0 rounded-sm object-contain group-data-[collapsible=icon]:h-7"
+                      src="/images/oplogo.png"
+                    />
+                    <span className="truncate text-left leading-none group-data-[collapsible=icon]:hidden">
+                      <span className="block font-semibold text-[12px] text-sidebar-foreground">
+                        Otago Polytechnic
+                      </span>
+                    </span>
                   </Link>
                 </SidebarMenuButton>
                 <Tooltip>
@@ -130,7 +138,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                     tooltip="New Chat"
                   >
                     <PenSquareIcon className="size-4" />
-                    <span className="font-medium">New chat</span>
+                    <span className="font-medium">New study chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 {user || isLocal ? (

@@ -13,7 +13,7 @@ export type LmStudioProbeResult = {
 const DEFAULT_LMSTUDIO_BASE_URL = "http://localhost:1234/v1";
 const DEFAULT_TIMEOUT_MS = 2000;
 
-function getLmStudioBaseUrl() {
+export function getLmStudioBaseUrl() {
   return (process.env.LMSTUDIO_BASE_URL || DEFAULT_LMSTUDIO_BASE_URL).replace(
     /\/$/,
     ""

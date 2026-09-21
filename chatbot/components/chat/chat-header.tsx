@@ -1,8 +1,8 @@
 "use client";
 
 import { PanelLeftIcon } from "lucide-react";
+import Image from "next/image";
 import { memo } from "react";
-import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useActiveChat } from "@/hooks/use-active-chat";
 import { useSyncMode } from "@/hooks/use-sync-mode";
@@ -24,18 +24,30 @@ function PureChatHeader({
   const { chatTitle, messages } = useActiveChat();
 
   return (
-    <header className="sticky top-0 flex h-14 items-center gap-2 bg-sidebar px-3">
-      <h1 className="shrink-0 text-white text-2xl font-bold">
-        🦙LLAMA solutions
-      </h1>
-      <Button
-        className="md:hidden"
+    <header className="app-chat-header sticky top-0 flex h-16 min-h-16 items-center gap-3 bg-sidebar px-4 text-sidebar-foreground">
+      <button
+        aria-label="Open navigation"
+        className="flex size-8 items-center justify-center rounded-lg text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden"
         onClick={toggleSidebar}
-        size="icon-sm"
-        variant="ghost"
+        type="button"
       >
         <PanelLeftIcon className="size-4" />
-      </Button>
+      </button>
+
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
+        <Image
+          alt="Otago Polytechnic"
+          className="app-brand-logo h-12 w-auto shrink-0 rounded-sm object-contain"
+          height={48}
+          src="/images/oplogo.png"
+          width={160}
+        />
+        <div className="min-w-0 leading-none">
+          <p className="truncate font-semibold text-sm">
+            Otago Polytechnic Assistant
+          </p>
+        </div>
+      </div>
 
       <div className="ml-auto flex min-w-0 items-center gap-2">
         {!isReadonly && !isLocal && (

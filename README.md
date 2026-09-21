@@ -6,8 +6,8 @@ This GitHub page is **only the source code**. Teachers can use a **public Vercel
 
 | How you open it | Model backend |
 | --- | --- |
-| Public Vercel URL (browser, any network) | Vercel AI Gateway — no LM Studio |
-| [http://localhost:3000](http://localhost:3000) after `pnpm dev` | LM Studio (school server or your laptop) |
+| Public Vercel URL (browser, any network) | Vercel AI Gateway only — no LM Studio |
+| [http://localhost:3000](http://localhost:3000) after `pnpm dev` | Cloud Gateway models (if a key/OIDC is set) **and** **Local / LM Studio** |
 
 ---
 
@@ -16,7 +16,7 @@ This GitHub page is **only the source code**. Teachers can use a **public Vercel
 After you sign in, you get:
 
 - **Voice in / out** — microphone dictation into the composer, and speak-back of the latest assistant reply
-- **Model picker + connection status** — header shows the current model and a **green** / **red** status dot (AI Gateway on Vercel, LM Studio for local `pnpm dev`)
+- **Model picker + connection status** — header shows the current model and a **green** / **red** status dot (AI Gateway for cloud models; LM Studio when **Local / LM Studio** is selected)
 - **Export** — download the current chat as Markdown (`.md`) or JSON (`.json`)
 - **Sidebar** — **New chat**, rename a chat (`…` → **Rename**), **Delete All Chats**
 - **Local incognito vs Cloud sync** — header toggle
@@ -28,7 +28,7 @@ After you sign in, you get:
 
 ## Public Vercel deploy (teachers / shared URL)
 
-Vercel cannot reach the school LM Studio host (`10.118.0.111`) or a classmate’s laptop. The hosted app therefore uses **cloud chat models through Vercel AI Gateway**. Local `pnpm dev` without a Gateway key still uses LM Studio.
+Vercel cannot reach the school LM Studio host (`10.118.0.111`) or a classmate’s laptop. The hosted app therefore uses **cloud chat models through Vercel AI Gateway**. Local `pnpm dev` can show both Gateway cloud models (if you have a key) and **Local / LM Studio**.
 
 ### Project settings
 
@@ -84,7 +84,7 @@ cp .env.example .env.local
 
 If you already have a teammate’s working `.env.local`, copy that file locally instead of inventing values.
 
-For **local LM Studio**, leave `AI_GATEWAY_API_KEY` empty. A real Gateway key (or running on Vercel) switches the app to cloud models.
+For **school LM Studio**, set `LMSTUDIO_BASE_URL` (see the table below), start the lab server on port **1234**, run `pnpm dev`, and pick **Local / LM Studio** in the model picker. You can keep `AI_GATEWAY_API_KEY` in `.env.local` for cloud models; it no longer hides the local option. On Vercel, only Gateway models appear.
 
 ### Live web search (Serper)
 
@@ -141,9 +141,9 @@ Then open **[http://localhost:3000](http://localhost:3000)**.
 
 ### 5. Read the status dot before you chat
 
-- **Green (local)** — the app can reach LM Studio (`GET /api/lmstudio` succeeded). You can send messages.
-- **Green (Vercel)** — AI Gateway is the active backend. The hosted site does **not** probe the school LM Studio IP.
-- **Red** — the local model is not reachable. Chat will fail until you fix the URL, campus network, or local LM Studio. This should not stay red on the public Vercel URL.
+- **Green (local model selected)** — the app can reach LM Studio (`GET /api/lmstudio` succeeded). You can send messages.
+- **Green (Gateway model selected, or Vercel)** — AI Gateway is the backend for that model. The hosted site does **not** probe the school LM Studio IP.
+- **Red** — the selected **Local / LM Studio** model is not reachable. Chat will fail until you fix the URL, campus network, or local LM Studio. This should not stay red on the public Vercel URL.
 
 The GitHub website cannot talk to `10.118.0.111`. Local LM Studio use requires `pnpm dev` (or the `npx.cmd` equivalent) **on a machine that is on campus Wi‑Fi** (or on a machine that can reach that IP). The Vercel URL does not have that restriction.
 

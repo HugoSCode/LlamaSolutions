@@ -1,8 +1,9 @@
 import { probeLmStudio } from "@/lib/ai/lmstudio";
-import { getAiRuntime } from "@/lib/ai/runtime";
+import { isOnVercel } from "@/lib/ai/runtime";
 
 export async function GET() {
-  if (getAiRuntime() === "gateway") {
+  // Cloud deploys cannot reach the school LAN LM Studio host.
+  if (isOnVercel()) {
     return Response.json(
       {
         models: [],

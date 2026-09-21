@@ -15,6 +15,6 @@ This directory is based on the [Vercel AI Chatbot](https://github.com/vercel/ai-
 
 Template-only scripts (from this folder): `pnpm dev`, `pnpm build`, `pnpm db:migrate`, `pnpm test`.
 
-- **Local class use:** follow the root README LM Studio path (`pnpm dev` / `npx.cmd --yes pnpm@10.32.1 dev`).
+- **Local class use:** follow the root README LM Studio path (`pnpm dev` / `npx.cmd --yes pnpm@10.32.1 dev`). At school, pick **Local / LM Studio** in the model picker while the lab server is running on port 1234.
 - **Public teachers’ URL:** deploy this folder to Vercel (Root Directory `chatbot`, Framework Next.js) with `AUTH_SECRET`, `POSTGRES_URL`, `SERPER_API_KEY`, and AI Gateway OIDC. Details are in the root README.
 
