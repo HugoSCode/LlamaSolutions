@@ -29,7 +29,6 @@ export async function generateTitleFromUserMessage({
     instructions: titlePrompt,
     model: getTitleModel(),
     prompt: getTextFromMessage(message),
-
   });
   return text
     .replace(/^[#*"\s]+/, "")
