@@ -159,7 +159,7 @@ const getHighlighter = (
 const createRawTokens = (code: string): TokenizedCode => ({
   bg: "transparent",
   fg: "inherit",
-  tokens: code.split("\n").map((line) =>
+  tokens: (code ?? "").split("\n").map((line) =>
     line === ""
       ? []
       : [

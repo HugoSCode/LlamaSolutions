@@ -14,7 +14,7 @@ export const DUMMY_PASSWORD = generateDummyPassword();
 
 export const suggestions = [
   "Help me make a study plan for this week",
-  "What's the latest news about NVIDIA?",
-  "AAPL stock price",
-  "What is the weather in Dunedin?",
+  "Explain this topic in a simple way",
+  "Quiz me on my upcoming exam",
+  "Help me improve my assignment draft",
 ];

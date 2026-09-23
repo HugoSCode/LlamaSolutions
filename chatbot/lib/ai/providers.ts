@@ -3,13 +3,11 @@ import { customProvider, gateway } from "ai";
 
 import { isTestEnvironment } from "../constants";
 
-import { getLmStudioBaseUrl } from "./lmstudio";
-import { getTitleModelConfig, resolveModelRuntime } from "./models";
-import { isAiGatewayEnabled } from "./runtime";
+import { titleModel } from "./models";
 
 const lmstudio = createOpenAI({
+  baseURL: process.env.LMSTUDIO_BASE_URL || "http://localhost:1234/v1",
   apiKey: process.env.LMSTUDIO_API_KEY || "lm-studio",
-  baseURL: getLmStudioBaseUrl(),
 });
 
 export const myProvider = isTestEnvironment
@@ -30,14 +28,10 @@ export const myProvider = isTestEnvironment
 
 export function getLanguageModel(modelId: string) {
   if (isTestEnvironment && myProvider) {
-    return myProvider.languageModel("chat-model");
+    return myProvider.languageModel(modelId);
   }
 
-  if (resolveModelRuntime(modelId) === "lmstudio") {
-    return lmstudio.chat(modelId);
-  }
-
-  return gateway.languageModel(modelId);
+  return lmstudio.chat(modelId);
 }
 
 export function getTitleModel() {
@@ -45,9 +39,5 @@ export function getTitleModel() {
     return myProvider.languageModel("title-model");
   }
 
-  if (isAiGatewayEnabled()) {
-    return gateway.languageModel(getTitleModelConfig().id);
-  }
-
-  return lmstudio.chat(process.env.LMSTUDIO_MODEL || getTitleModelConfig().id);
+  return lmstudio.chat(process.env.LMSTUDIO_MODEL || "your-model-id");
 }
