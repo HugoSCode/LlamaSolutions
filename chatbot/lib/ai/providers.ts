@@ -5,8 +5,9 @@ import { isTestEnvironment } from "../constants";
 
 import { titleModel } from "./models";
 
+
 const lmstudio = createOpenAI({
-  baseURL: `${process.env.LMSTUDIO_BASE_URL}/v1` || "http://localhost:1234/v1",
+  baseURL: process.env.LMSTUDIO_BASE_URL || "http://localhost:1234/v1",
   apiKey: process.env.LMSTUDIO_API_KEY || "lm-studio",
   headers: {
     'ngrok-skip-browser-warning': 'true',
