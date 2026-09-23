@@ -11,6 +11,20 @@ AI:       LM Studio (future)
 ```
 ```
 
+# Remote connections
+The application is deployed with vercel. To work around the Otago Polytechnics remote connection restrictions the vercel deployment has a LM_STUDIO_BASE_URL environment variable that points to: **https://pamphlet-obstruct-displace.ngrok-free.dev**. This is a tunnel provided by ngrok that points to our locally running Lm Studio server: **http://localhost:1234**.
+
+For the tunnel to work, the PC must always be on and ngrok must always be running (Shown below).
+<img width="925" height="419" alt="image" src="https://github.com/user-attachments/assets/bd3723d7-b69a-4903-9d3a-95116009878d" />
+
+To prevent the tunnel being dropped, I set the PC to never auto-sleep (command shown below)
+
+<img width="582" height="153" alt="image" src="https://github.com/user-attachments/assets/13470dbe-50ed-4e2a-ba01-f7adb65624a9" />
+
+- For better implementation it would be wise to setup Task scheduler (on the LM studio server) to start up lmstudio + the models and run the ngrok command upon the computer starting up.  
+
+
+
 # Local Development Setup — Vercel Chatbot + Neon + LMStudio
 
 This project uses the **Vercel Chatbot** template as the frontend/application framework. The long-term goal is to connect it to a self-hosted LLM through **LM Studio**.
