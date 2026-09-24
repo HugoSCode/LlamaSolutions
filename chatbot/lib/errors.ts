@@ -16,6 +16,7 @@ export type Surface =
   | "vote"
   | "document"
   | "suggestions"
+  | "moderation"
   | "activate_gateway";
 
 export type ErrorCode = `${ErrorType}:${Surface}`;
@@ -33,6 +34,7 @@ export const visibilityBySurface: Record<Surface, ErrorVisibility> = {
   stream: "response",
   suggestions: "response",
   vote: "response",
+  moderation: "response",
 };
 
 export class ChatbotError extends Error {
@@ -115,7 +117,8 @@ export function getMessageByErrorCode(errorCode: ErrorCode): string {
       return "You need to sign in to view this document. Please sign in and try again.";
     case "bad_request:document":
       return "The request to create or update the document was invalid. Please check your input and try again.";
-
+    case "forbidden:moderation":
+      return "Your message was blocked by our content policy. Please rephrase and try again.";
     default:
       return "Something went wrong. Please try again later.";
   }
