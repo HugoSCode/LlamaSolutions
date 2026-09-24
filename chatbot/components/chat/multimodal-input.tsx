@@ -63,6 +63,7 @@ import {
 } from "./slash-commands";
 import { SuggestedActions } from "./suggested-actions";
 import type { VisibilityType } from "./visibility-selector";
+import { VoiceInputButton } from "./voice-input-button";
 
 function setCookie(name: string, value: string) {
   const maxAge = 60 * 60 * 24 * 365;
@@ -549,6 +550,11 @@ function PureMultimodalInput({
               fileInputRef={fileInputRef}
               selectedModelId={selectedModelId}
               status={status}
+            />
+            <VoiceInputButton
+              disabled={status === "submitted" || uploadQueue.length > 0}
+              input={input}
+              setInput={setInput}
             />
             <ModelSelectorCompact
               onModelChange={onModelChange}

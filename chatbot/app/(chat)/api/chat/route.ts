@@ -48,6 +48,10 @@ import { convertToUIMessages, generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
+import { appendFile } from "node:fs/promises";
+import { isFlagged } from "@/lib/moderation";
+
+
 export const maxDuration = 60;
 
 const HEALTH_CHECK_DELAY_MS = 9000;
@@ -113,6 +117,17 @@ export async function POST(request: Request) {
     }
 
     const isToolApprovalFlow = Boolean(messages);
+    if (message?.role === "user") {
+      const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
+
+      if (await isFlagged(text)) {
+        await appendFile(
+          "flagged.jsonl",
+          JSON.stringify({ userId: session.user.id, chatId: id, text, ts: Date.now() }) + "\n"
+        );
+        return new ChatbotError("forbidden:moderation").toResponse();
+      }
+    }
 
     const chat = await getChatById({ id });
     let messagesFromDb: DBMessage[] = [];
@@ -272,14 +287,14 @@ export async function POST(request: Request) {
             isReasoningModel && !supportsTools
               ? []
               : [
-                  "getWeather",
-                  "createDocument",
-                  "editDocument",
-                  "updateDocument",
-                  "requestSuggestions",
-                  "webSearch",
+                "getWeather",
+                "createDocument",
+                "editDocument",
+                "updateDocument",
+                "requestSuggestions",
+                "webSearch",
 
-                ],
+              ],
           instructions: systemPrompt({ requestHints, supportsTools }),
           messages: modelMessages,
           model: getLanguageModel(chatModel),

@@ -1,59 +1,29 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { searchSerper } from "./serper";
 
 export const webSearch = tool({
   description:
-    "Search the web for current, recent, or up-to-date information. Use this when the user asks about news, current events, recent information, websites, companies, products, or anything that may have changed recently.",
-
+    "Search the live web for current facts. Use this for stock prices (e.g. AAPL), website lookups, 'search X', and general Google-style questions. Do not invent live facts — call this tool. For a specific site, include the URL or domain in the query.",
+  execute: async ({ query }) => searchSerper({ query, type: "search" }),
   inputSchema: z.object({
     query: z
       .string()
-      .describe("The search query to send to Google Search"),
+      .describe(
+        "Search query, e.g. 'AAPL stock price', 'site:otago.ac.nz exam dates', or 'weather Dunedin this week'"
+      ),
   }),
+});
 
-  execute: async ({ query }) => {
-    const apiKey = process.env.SERPER_API_KEY;
-
-    if (!apiKey) {
-      return {
-        error: "SERPER_API_KEY is not configured.",
-      };
-    }
-
-    try {
-      const response = await fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          q: query,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-
-        return {
-          error: `Serper API request failed (${response.status}): ${errorText}`,
-        };
-      }
-
-      const data = await response.json();
-
-      return {
-        query,
-        results: data.organic ?? [],
-        answerBox: data.answerBox ?? null,
-        knowledgeGraph: data.knowledgeGraph ?? null,
-      };
-    } catch (error) {
-      console.error("Web search error:", error);
-
-      return {
-        error: "Failed to search the web. Please try again.",
-      };
-    }
-  },
+export const searchNews = tool({
+  description:
+    "Search Google News for the latest headlines and articles. Use this when the user asks for news, what happened today, or recent coverage of a company or topic. Do not invent headlines — call this tool.",
+  execute: async ({ query }) => searchSerper({ query, type: "news" }),
+  inputSchema: z.object({
+    query: z
+      .string()
+      .describe(
+        "News search query, e.g. 'NVIDIA' or 'latest news about New Zealand'"
+      ),
+  }),
 });

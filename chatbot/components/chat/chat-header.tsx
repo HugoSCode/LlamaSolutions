@@ -3,7 +3,14 @@
 import { PanelLeftIcon } from "lucide-react";
 import { memo } from "react";
 import { useSidebar } from "@/components/ui/sidebar";
-import { VisibilitySelector, type VisibilityType } from "./visibility-selector";
+import { useActiveChat } from "@/hooks/use-active-chat";
+import { useSyncMode } from "@/hooks/use-sync-mode";
+import { ExportChatButton } from "./export-chat-button";
+import { SyncModeToggle } from "./sync-mode-toggle";
+import {
+  VisibilitySelector,
+  type VisibilityType,
+} from "./visibility-selector";
 
 function PureChatHeader({
   chatId,
@@ -15,6 +22,8 @@ function PureChatHeader({
   isReadonly: boolean;
 }) {
   const { state, toggleSidebar, isMobile } = useSidebar();
+  const { isLocal } = useSyncMode();
+  const { chatTitle, messages } = useActiveChat();
 
   if (state === "collapsed" && !isMobile) {
     return null;
@@ -37,20 +46,36 @@ function PureChatHeader({
           className="app-brand-logo h-12 w-auto shrink-0 rounded-sm object-contain"
           src="/images/oplogo.png"
         />
+
         <div className="min-w-0 leading-none">
-          <p className="truncate font-semibold text-sm">Otago Polytechnic Assistant</p>
+          <p className="truncate font-semibold text-sm">
+            Otago Polytechnic Assistant
+          </p>
         </div>
       </div>
 
-      {!isReadonly && (
-        <VisibilitySelector
-          chatId={chatId}
-          selectedVisibilityType={selectedVisibilityType}
-        />
-      )}
+      <div className="ml-auto flex min-w-0 items-center gap-2">
+        {!isReadonly && !isLocal && (
+          <VisibilitySelector
+            chatId={chatId}
+            selectedVisibilityType={selectedVisibilityType}
+          />
+        )}
 
-      <div className="app-study-space ml-auto hidden rounded-full border border-sidebar-border bg-sidebar-accent/40 px-3 py-1.5 text-xs text-sidebar-foreground/70 md:block">
-        Study space
+        <ExportChatButton
+          chatId={chatId}
+          fallback={{
+            id: chatId,
+            messages,
+            title: chatTitle,
+          }}
+        />
+
+        <SyncModeToggle
+          chatId={chatId}
+          messages={messages}
+          title={chatTitle}
+        />
       </div>
     </header>
   );

@@ -12,10 +12,7 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
-import {
-  getChatHistoryPaginationKey,
-  SidebarHistory,
-} from "@/components/chat/sidebar-history";
+import { SidebarHistory } from "@/components/chat/sidebar-history";
 import { SidebarUserNav } from "@/components/chat/sidebar-user-nav";
 import {
   Sidebar,
@@ -31,6 +28,10 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useSyncMode } from "@/hooks/use-sync-mode";
+import { deleteAllChatsByMode } from "@/lib/chat-client";
+import { getChatHistoryPaginationKey } from "@/lib/chat-history";
+import { LOCAL_HISTORY_SWR_KEY } from "@/lib/local-chats";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,6 +48,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { setOpenMobile, toggleSidebar } = useSidebar();
   const { mutate } = useSWRConfig();
+  const { isLocal } = useSyncMode();
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false);
 
   const closeMobile = useCallback(() => {
@@ -69,16 +71,16 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const handleDeleteAll = useCallback(() => {
     setShowDeleteAllDialog(false);
     router.replace("/");
-    mutate(unstable_serialize(getChatHistoryPaginationKey), [], {
-      revalidate: false,
-    });
 
-    fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/history`, {
-      method: "DELETE",
+    deleteAllChatsByMode(isLocal).then(() => {
+      mutate(LOCAL_HISTORY_SWR_KEY);
+      mutate(unstable_serialize(getChatHistoryPaginationKey), [], {
+        revalidate: !isLocal,
+      });
     });
 
     toast.success("All chats deleted");
-  }, [mutate, router]);
+  }, [isLocal, mutate, router]);
 
   return (
     <>
@@ -139,7 +141,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                     <span className="font-medium">New study chat</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {user ? (
+                {user || isLocal ? (
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       className="rounded-lg text-sidebar-foreground/40 transition-colors duration-150 hover:bg-destructive/10 hover:text-destructive"
@@ -170,8 +172,9 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete all chats?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all
-              your chats and remove them from our servers.
+              {isLocal
+                ? "This will permanently delete all chats stored in this browser."
+                : "This action cannot be undone. This will permanently delete all your chats and remove them from our servers."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
