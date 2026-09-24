@@ -7,6 +7,13 @@ export const titleModel = {
   provider: "lmstudio",
 };
  
+export const moderationModel = {
+  description: "OpenAI moderation model for pre-screening user input",
+  id: "omni-moderation-latest",
+  name: "OpenAI Moderation",
+  provider: "openai",
+};
+
 export type ModelCapabilities = {
   tools: boolean;
   vision: boolean;
