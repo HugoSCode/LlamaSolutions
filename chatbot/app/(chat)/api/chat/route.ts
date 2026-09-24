@@ -121,10 +121,6 @@ export async function POST(request: Request) {
       const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
 
       if (await isFlagged(text)) {
-        await appendFile(
-          "flagged.jsonl",
-          JSON.stringify({ userId: session.user.id, chatId: id, text, ts: Date.now() }) + "\n"
-        );
         return new ChatbotError("forbidden:moderation").toResponse();
       }
     }
