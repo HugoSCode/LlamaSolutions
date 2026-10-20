@@ -62,6 +62,5 @@ export async function isFlagged(text: string) {
     }]
   });
 
-  console.log(decision)
-
+  return decision.answers[0]["choice"] !== "safe";
 }

@@ -120,6 +120,7 @@ export async function POST(request: Request) {
     if (message?.role === "user") {
       const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
 
+      /*---MODERATION---*/
       if (await isFlagged(text)) {
         return new ChatbotError("forbidden:moderation").toResponse();
       }
@@ -305,7 +306,8 @@ export async function POST(request: Request) {
           onEnd() {
             stopWaitingStatus();
           },
-          onError() {
+          onError({ error }) {
+            console.error("STREAM TEXT ERROR:", error);
             stopWaitingStatus();
           },
           providerOptions: {
