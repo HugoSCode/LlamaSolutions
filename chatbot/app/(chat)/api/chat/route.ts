@@ -121,7 +121,7 @@ export async function POST(request: Request) {
       const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
 
       /*---MODERATION---*/
-      if (await isFlagged(text)) {
+      if (await isFlagged(text, session, id)) {
         return new ChatbotError("forbidden:moderation").toResponse();
       }
     }

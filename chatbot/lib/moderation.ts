@@ -1,6 +1,7 @@
 import OpenAI from "openai";
+import fs from "fs";
 
-export async function isFlagged(text: string) {
+export async function isFlagged(text: string, session: any, id: string) {
 
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
@@ -60,7 +61,13 @@ export async function isFlagged(text: string) {
         }
       ]
     }]
-  });
+  })
+  console.log("Moderation decision:", decision);
 
-  return decision.answers[0]["choice"] !== "safe";
+  if (decision.answers[0]["choice"] !== "safe") {
+    fs.appendFileSync("moderation.log", `Flagged message: ${text}\nDecision: ${JSON.stringify(decision)}\nuserId: ${session.user.id}, chatId: ${id}, text: ${text}, ts: ${Date.now()} }) \n\n`);
+    return true;
+  } else {
+    return false;
+  }
 }
