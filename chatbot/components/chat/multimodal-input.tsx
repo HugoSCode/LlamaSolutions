@@ -7,6 +7,7 @@ import {
   ArrowUpIcon,
   BrainIcon,
   EyeIcon,
+  GlobeIcon,
   LockIcon,
   WrenchIcon,
 } from "lucide-react";
@@ -114,9 +115,7 @@ function PureMultimodalInput({
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   messages: UIMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  sendMessage:
-    | UseChatHelpers<ChatMessage>["sendMessage"]
-    | (() => Promise<void>);
+  sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   className?: string;
   selectedVisibilityType: VisibilityType;
   selectedModelId: string;
@@ -161,6 +160,7 @@ function PureMultimodalInput({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<string[]>([]);
+  const [webSearch, setWebSearch] = useState(false);
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
@@ -258,21 +258,24 @@ function PureMultimodalInput({
       `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/chat/${chatId}`
     );
 
-    sendMessage({
-      parts: [
-        ...attachments.map((attachment) => ({
-          mediaType: attachment.contentType,
-          name: attachment.name,
-          type: "file" as const,
-          url: attachment.url,
-        })),
-        {
-          text: input,
-          type: "text",
-        },
-      ],
-      role: "user",
-    });
+    sendMessage(
+      {
+        parts: [
+          ...attachments.map((attachment) => ({
+            mediaType: attachment.contentType,
+            name: attachment.name,
+            type: "file" as const,
+            url: attachment.url,
+          })),
+          {
+            text: input,
+            type: "text",
+          },
+        ],
+        role: "user",
+      },
+      { body: { webSearch } }
+    );
 
     setAttachments([]);
     setLocalStorageInput("");
@@ -290,6 +293,7 @@ function PureMultimodalInput({
     setLocalStorageInput,
     width,
     chatId,
+    webSearch,
   ]);
 
   const uploadFile = useCallback(
@@ -432,6 +436,14 @@ function PureMultimodalInput({
   const handleSlashClose = useCallback(() => {
     setSlashOpen(false);
   }, []);
+
+  const handleToggleWebSearch = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      setWebSearch((enabled) => !enabled);
+    },
+    []
+  );
 
   const handlePromptSubmit = useCallback(() => {
     if (input.startsWith("/")) {
@@ -597,6 +609,31 @@ function PureMultimodalInput({
               input={input}
               setInput={setInput}
             />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label={
+                    webSearch ? "Turn off web search" : "Turn on web search"
+                  }
+                  aria-pressed={webSearch}
+                  className={cn(
+                    "h-7 w-7 rounded-lg border border-border/40 p-1 transition-colors",
+                    webSearch
+                      ? "border-foreground bg-foreground text-background hover:bg-foreground/90"
+                      : "text-foreground hover:border-border hover:text-foreground"
+                  )}
+                  data-testid="web-search-toggle"
+                  onClick={handleToggleWebSearch}
+                  type="button"
+                  variant="ghost"
+                >
+                  <GlobeIcon className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                {webSearch ? "Web search on" : "Web search off"}
+              </TooltipContent>
+            </Tooltip>
             <ModelSelectorCompact
               onModelChange={onModelChange}
               selectedModelId={selectedModelId}

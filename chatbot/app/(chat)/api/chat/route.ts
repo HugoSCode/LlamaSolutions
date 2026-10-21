@@ -12,6 +12,7 @@ import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
+import { fetchWebSearchContext } from "@/lib/ai/duckduckgo";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
   getActiveModels,
@@ -65,8 +66,6 @@ function getStreamContext() {
   }
 }
 
-export { getStreamContext };
-
 export async function POST(request: Request) {
   let requestBody: PostRequestBody;
 
@@ -85,6 +84,7 @@ export async function POST(request: Request) {
       persist = true,
       selectedChatModel,
       selectedVisibilityType,
+      webSearch: webSearchEnabled,
     } = requestBody;
 
     const [botIdResult, session] = await Promise.all([
@@ -229,6 +229,18 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    let webSearchContext = "";
+    if (webSearchEnabled && message?.role === "user") {
+      const query = message.parts
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join(" ")
+        .trim();
+      if (query) {
+        const fetchedWebSearch = await fetchWebSearchContext(query);
+        webSearchContext = fetchedWebSearch.context;
+      }
+    }
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         const modelName = modelConfig?.name ?? chatModel;
@@ -293,20 +305,23 @@ export async function POST(request: Request) {
           clearHealthCheckTimer();
         };
 
+        const selectableTools = [
+          "getWeather",
+          "webSearch",
+          "searchNews",
+          "createDocument",
+          "editDocument",
+          "updateDocument",
+          "requestSuggestions",
+        ] as const;
+        const modelTools =
+          webSearchEnabled || (isReasoningModel && !supportsTools)
+            ? []
+            : selectableTools;
+
         const result = streamText({
-          activeTools:
-            isReasoningModel && !supportsTools
-              ? []
-              : [
-                  "getWeather",
-                  "webSearch",
-                  "searchNews",
-                  "createDocument",
-                  "editDocument",
-                  "updateDocument",
-                  "requestSuggestions",
-                ],
-          instructions: systemPrompt({ requestHints, supportsTools }),
+          activeTools: modelTools,
+          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {
