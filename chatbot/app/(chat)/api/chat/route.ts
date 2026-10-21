@@ -121,6 +121,7 @@ export async function POST(request: Request) {
       const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
 
       /*---MODERATION---*/
+      console.log('\nUser message moderation:')
       if (await isFlagged(text, session, id)) {
         return new ChatbotError("forbidden:moderation").toResponse();
       }
@@ -345,6 +346,13 @@ export async function POST(request: Request) {
           },
         });
 
+  /*-------LLM Chat response moderation-------------*/
+        console.log("\nModel message moderation")
+        const responseText = await result.text;
+        if (await isFlagged(responseText, session, id)){
+          return new ChatbotError("forbidden:moderation").toResponse();
+        }
+ /*----THIS IS WHERE LLM CHAT GETS DISPLAYED------*/
         dataStream.merge(
           toUIMessageStream({
             sendReasoning: isReasoningModel,
