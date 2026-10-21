@@ -120,11 +120,8 @@ export async function POST(request: Request) {
     if (message?.role === "user") {
       const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
 
-      if (await isFlagged(text)) {
-        await appendFile(
-          "flagged.jsonl",
-          JSON.stringify({ userId: session.user.id, chatId: id, text, ts: Date.now() }) + "\n"
-        );
+      /*---MODERATION---*/
+      if (await isFlagged(text, session, id)) {
         return new ChatbotError("forbidden:moderation").toResponse();
       }
     }
@@ -309,7 +306,8 @@ export async function POST(request: Request) {
           onEnd() {
             stopWaitingStatus();
           },
-          onError() {
+          onError({ error }) {
+            console.error("STREAM TEXT ERROR:", error);
             stopWaitingStatus();
           },
           providerOptions: {
