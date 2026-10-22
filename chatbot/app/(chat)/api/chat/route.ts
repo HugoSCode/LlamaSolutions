@@ -12,6 +12,7 @@ import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
+import { fetchWebSearchContext } from "@/lib/ai/duckduckgo";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
   allowedModelIds,
@@ -83,8 +84,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
-      requestBody;
+    const {
+      id,
+      message,
+      messages,
+      selectedChatModel,
+      selectedVisibilityType,
+      webSearch: webSearchEnabled,
+    } = requestBody;
 
     const [botIdResult, session] = await Promise.all([
       checkBotId().catch(() => null),
@@ -214,6 +221,18 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    let webSearchContext = "";
+    if (webSearchEnabled && message?.role === "user") {
+      const query = message.parts
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join(" ")
+        .trim();
+      if (query) {
+        const fetchedWebSearch = await fetchWebSearchContext(query);
+        webSearchContext = fetchedWebSearch.context;
+      }
+    }
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         const modelName = modelConfig?.name ?? chatModel;
@@ -280,7 +299,7 @@ export async function POST(request: Request) {
 
         const result = streamText({
           activeTools:
-            isReasoningModel && !supportsTools
+            webSearchEnabled || (isReasoningModel && !supportsTools)
               ? []
               : [
                 "getWeather",
@@ -291,7 +310,7 @@ export async function POST(request: Request) {
                 "webSearch",
 
               ],
-          instructions: systemPrompt({ requestHints, supportsTools }),
+          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {
