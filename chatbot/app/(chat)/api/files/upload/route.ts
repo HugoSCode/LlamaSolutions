@@ -1,6 +1,7 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { PDFParse } from "pdf-parse";
 
 import { auth } from "@/app/(auth)/auth";
 
@@ -15,6 +16,10 @@ const FileSchema = z.object({
     }),
 });
 
+const MAX_PDF_SIZE = 10 * 1024 * 1024;
+const MAX_PDF_PAGES = 100;
+const MAX_PDF_TEXT_LENGTH = 80000;
+
 export async function POST(request: Request) {
   const session = await auth();
 
@@ -28,9 +33,9 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
-    const file = formData.get("file") as Blob;
+    const file = formData.get("file");
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
@@ -44,8 +49,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    const filename = (formData.get("file") as File).name;
-    const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const fileBuffer = await file.arrayBuffer();
 
     try {
