@@ -236,16 +236,24 @@ function PureMultimodalInput({
 
     sendMessage({
       parts: [
-        ...attachments.map((attachment) => ({
-          mediaType: attachment.contentType,
-          name: attachment.name,
-          type: "file" as const,
-          url: attachment.url,
-        })),
-        {
-          text: input,
-          type: "text",
-        },
+        ...attachments.map((attachment) =>
+          attachment.extractedText
+            ? {
+                data: {
+                  id: crypto.randomUUID(),
+                  name: attachment.name,
+                  text: attachment.extractedText,
+                },
+                type: "data-pdf-context" as const,
+              }
+            : {
+                mediaType: attachment.contentType,
+                name: attachment.name,
+                type: "file" as const,
+                url: attachment.url,
+              }
+        ),
+        ...(input.trim() ? [{ text: input, type: "text" as const }] : []),
       ],
       role: "user",
     });
@@ -283,12 +291,13 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, pathname, contentType, extractedText } = data;
 
         return {
           contentType,
-          name: pathname,
-          url,
+          extractedText,
+          name: pathname ?? file.name,
+          url: url ?? `pdf:${crypto.randomUUID()}`,
         };
       }
       const { error } = await response.json();
@@ -483,6 +492,7 @@ function PureMultimodalInput({
         )}
 
       <input
+        accept=".pdf,application/pdf,image/jpeg,image/png"
         className="pointer-events-none fixed -top-4 -left-4 size-0.5 opacity-0"
         multiple
         onChange={handleFileChange}
@@ -548,7 +558,6 @@ function PureMultimodalInput({
           <PromptInputTools>
             <AttachmentsButton
               fileInputRef={fileInputRef}
-              selectedModelId={selectedModelId}
               status={status}
             />
             <VoiceInputButton
@@ -568,12 +577,12 @@ function PureMultimodalInput({
             <PromptInputSubmit
               className={cn(
                 "h-7 w-7 rounded-xl transition-all duration-200",
-                input.trim()
+                input.trim() || attachments.length > 0
                   ? "bg-foreground text-background hover:opacity-85 active:scale-95"
                   : "bg-muted text-muted-foreground/25 cursor-not-allowed"
               )}
               data-testid="send-button"
-              disabled={!input.trim() || uploadQueue.length > 0}
+              disabled={(!input.trim() && attachments.length === 0) || uploadQueue.length > 0}
               status={status}
               variant="secondary"
             >
@@ -644,21 +653,10 @@ const AttachmentPreviewItem = memo(PureAttachmentPreviewItem);
 function PureAttachmentsButton({
   fileInputRef,
   status,
-  selectedModelId,
 }: {
   fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
   status: UseChatHelpers<ChatMessage>["status"];
-  selectedModelId: string;
 }) {
-  const { data: modelsResponse } = useSWR(
-    `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/models`,
-    (url: string) => fetch(url).then((r) => r.json()),
-    { dedupingInterval: 3_600_000, revalidateOnFocus: false }
-  );
-
-  const caps: Record<string, ModelCapabilities> | undefined =
-    modelsResponse?.capabilities ?? modelsResponse;
-  const hasVision = caps?.[selectedModelId]?.vision ?? false;
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
@@ -671,12 +669,10 @@ function PureAttachmentsButton({
     <Button
       className={cn(
         "h-7 w-7 rounded-lg border border-border/40 p-1 transition-colors",
-        hasVision
-          ? "text-foreground hover:border-border hover:text-foreground"
-          : "text-muted-foreground/30 cursor-not-allowed"
+        "text-foreground hover:border-border hover:text-foreground"
       )}
       data-testid="attachments-button"
-      disabled={status !== "ready" || !hasVision}
+      disabled={status !== "ready"}
       onClick={handleClick}
       variant="ghost"
     >
