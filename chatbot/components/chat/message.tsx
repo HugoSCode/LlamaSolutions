@@ -112,6 +112,9 @@ const PurePreviewMessage = ({
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === "file"
   );
+  const pdfAttachments = message.parts.filter(
+    (part) => part.type === "data-pdf-context"
+  );
 
   useDataStream();
 
