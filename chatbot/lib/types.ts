@@ -53,6 +53,11 @@ export type CustomUIDataTypes = {
   finish: null;
   "chat-title": string;
   "waiting-status": WaitingStatusData;
+  "pdf-context": {
+    id: string;
+    name: string;
+    text: string;
+  };
 };
 
 export type ChatMessage = UIMessage<
@@ -65,4 +70,5 @@ export type Attachment = {
   name: string;
   url: string;
   contentType: string;
+  extractedText?: string;
 };
