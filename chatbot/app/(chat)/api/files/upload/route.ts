@@ -39,6 +39,68 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+    if (file.type === "application/pdf" || safeName.toLowerCase().endsWith(".pdf")) {
+      if (file.type !== "application/pdf") {
+        return NextResponse.json(
+          { error: "The uploaded file is not a valid PDF" },
+          { status: 400 }
+        );
+      }
+
+      if (file.size > MAX_PDF_SIZE) {
+        return NextResponse.json(
+          { error: "PDF size should be less than 10MB" },
+          { status: 400 }
+        );
+      }
+
+      const parser = new PDFParse({ data: Buffer.from(await file.arrayBuffer()) });
+      try {
+        const info = await parser.getInfo();
+        if (info.total > MAX_PDF_PAGES) {
+          return NextResponse.json(
+            { error: "PDFs must contain 100 pages or fewer" },
+            { status: 400 }
+          );
+        }
+
+        const result = await parser.getText();
+        const extractedText = result.text.trim();
+        if (!extractedText) {
+          return NextResponse.json(
+            { error: "No selectable text found. Scanned PDFs are not supported yet." },
+            { status: 422 }
+          );
+        }
+
+        if (extractedText.length > MAX_PDF_TEXT_LENGTH) {
+          return NextResponse.json(
+            { error: "PDF text is too long. Upload a shorter document (80,000 characters maximum)." },
+            { status: 400 }
+          );
+        }
+
+        return NextResponse.json({
+          contentType: "application/pdf",
+          extractedText,
+          pathname: safeName,
+        });
+      } catch (error) {
+        console.error(
+          "PDF parsing failed:",
+          error instanceof Error ? error.message : error
+        );
+        return NextResponse.json(
+          { error: "Could not read this PDF. Check that the file is valid and not password-protected." },
+          { status: 400 }
+        );
+      } finally {
+        await parser.destroy();
+      }
+    }
+
     const validatedFile = FileSchema.safeParse({ file });
 
     if (!validatedFile.success) {
