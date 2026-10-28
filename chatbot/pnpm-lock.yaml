@@ -61,7 +61,7 @@ importers:
         version: 0.24.1
       '@vercel/functions':
         specifier: ^3.7.5
-        version: 3.7.5(ws@8.18.1(bufferutil@4.0.9))
+        version: 3.7.5
       '@vercel/otel':
         specifier: ^1.12.0
         version: 1.14.2(@opentelemetry/api-logs@0.200.0)(@opentelemetry/api@1.9.1)(@opentelemetry/instrumentation@0.57.2(@opentelemetry/api@1.9.1))(@opentelemetry/resources@1.30.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-logs@0.57.2(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-metrics@1.30.1(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.1))
@@ -128,6 +128,9 @@ importers:
       next-themes:
         specifier: ^0.3.0
         version: 0.3.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      openai:
+        specifier: ^7.45.1
+        version: 7.45.1(undici@7.29.0)(zod@4.4.3)
       orderedmap:
         specifier: ^2.1.1
         version: 2.1.1
@@ -4075,6 +4078,33 @@ packages:
   oniguruma-to-es@4.3.6:
     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
 
+  openai@7.45.1:
+    resolution: {integrity: sha512-mutrJXwhJIMZ24Lab2COFtNp44OcpZSnV4O2O7q38wAHUa2m2fQqUO5pj1XS3PqLfOTeODBUS9YoadqDnnGk5A==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      google-auth-library: '>=9.15.1 <12'
+      undici: '>=5 <9'
+      ws: ^8.21.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      google-auth-library:
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   optionator@0.9.4:
     resolution: {integrity: sha512-6IpQ7mKUxRcZNLIObR0hz7lxsapSSIYNZJwXPGeF0mTVqGKFIXj1DQcMoT22S3ROcLyY/rz0PWaWZ9ayWmad9g==}
     engines: {node: '>= 0.8.0'}
@@ -6979,11 +7009,9 @@ snapshots:
     dependencies:
       execa: 5.1.1
 
-  '@vercel/functions@3.7.5(ws@8.18.1(bufferutil@4.0.9))':
+  '@vercel/functions@3.7.5':
     dependencies:
       '@vercel/oidc': 3.8.0
-    optionalDependencies:
-      ws: 8.18.1(bufferutil@4.0.9)
 
   '@vercel/oidc@3.2.0': {}
 
@@ -8614,6 +8642,11 @@ snapshots:
       oniguruma-parser: 0.12.2
       regex: 6.1.0
       regex-recursion: 6.0.2
+
+  openai@7.45.1(undici@7.29.0)(zod@4.4.3):
+    optionalDependencies:
+      undici: 7.29.0
+      zod: 4.4.3
 
   optionator@0.9.4:
     dependencies:
