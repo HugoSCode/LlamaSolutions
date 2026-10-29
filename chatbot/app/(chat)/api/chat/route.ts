@@ -12,6 +12,12 @@ import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
+import { fetchWebSearchContext } from "@/lib/ai/duckduckgo";
+import {
+  LIVE_INFO_NOTICE,
+  needsLiveInfo,
+  webSearchOffPrompt,
+} from "@/lib/ai/live-info";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import {
   allowedModelIds,
@@ -83,8 +89,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { id, message, messages, selectedChatModel, selectedVisibilityType } =
-      requestBody;
+    const {
+      id,
+      message,
+      messages,
+      selectedChatModel,
+      selectedVisibilityType,
+      webSearch: webSearchEnabled,
+    } = requestBody;
 
     const [botIdResult, session] = await Promise.all([
       checkBotId().catch(() => null),
@@ -216,8 +228,50 @@ export async function POST(request: Request) {
 
     const modelMessages = await convertToModelMessages(uiMessages);
 
+    const userQuery =
+      message?.role === "user"
+        ? message.parts
+            .flatMap((part) => (part.type === "text" ? [part.text] : []))
+            .join(" ")
+            .trim()
+        : "";
+
+    let webSearchContext = "";
+    if (webSearchEnabled && userQuery) {
+      const fetchedWebSearch = await fetchWebSearchContext(userQuery);
+      webSearchContext = fetchedWebSearch.context;
+    }
+
+    const refuseLiveGuess = !webSearchEnabled && needsLiveInfo(userQuery);
+
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
+        if (refuseLiveGuess) {
+          const textId = generateId();
+          dataStream.write({ type: "start" });
+          dataStream.write({ type: "start-step" });
+          dataStream.write({ id: textId, type: "text-start" });
+          dataStream.write({
+            delta: LIVE_INFO_NOTICE,
+            id: textId,
+            type: "text-delta",
+          });
+          dataStream.write({ id: textId, type: "text-end" });
+          dataStream.write({ type: "finish-step" });
+          dataStream.write({ finishReason: "stop", type: "finish" });
+
+          if (titlePromise) {
+            try {
+              const title = await titlePromise;
+              dataStream.write({ data: title, type: "data-chat-title" });
+              updateChatTitleById({ chatId: id, title });
+            } catch {
+              /* non-fatal */
+            }
+          }
+          return;
+        }
+
         const modelName = modelConfig?.name ?? chatModel;
         let hasModelActivity = false;
         let healthCheckTimer: ReturnType<typeof setTimeout> | undefined;
@@ -282,7 +336,7 @@ export async function POST(request: Request) {
 
         const result = streamText({
           activeTools:
-            isReasoningModel && !supportsTools
+            webSearchEnabled || (isReasoningModel && !supportsTools)
               ? []
               : [
                 "getWeather",
@@ -293,7 +347,7 @@ export async function POST(request: Request) {
                 "webSearch",
 
               ],
-          instructions: systemPrompt({ requestHints, supportsTools }),
+          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled ? "" : webSearchOffPrompt}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {
