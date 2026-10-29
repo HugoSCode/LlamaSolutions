@@ -69,5 +69,33 @@ export async function isFlagged(text: string, session: any, id: string) {
     return true;
   } else {
     return false;
+
+  } catch (error) {
+
+    if (error instanceof OpenAI.APIError) {
+      console.error("OpenAI API error:", {
+        status: error.status,
+        code: error.code,
+        message: error.message,
+      });
+
+      if (
+        error.code === "insufficient_quota" ||
+        error.code === "credit_balance_exhausted" ||
+        error.code === "organization_spend_limit_exceeded" ||
+        error.code === "project_spend_limit_exceeded" ||
+        error.code === "organization_usage_limit_exceeded"
+      ) {
+        console.error(
+          "OpenAI quota or billing limit reached. Check API billing."
+        );
+      }
+    } else {
+      console.error("Moderation failed:", error);
+    }
+
+    // Do not silently allow a message through when moderation fails.
+    throw error;
+
   }
 }
