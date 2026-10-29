@@ -231,9 +231,9 @@ export async function POST(request: Request) {
     const userQuery =
       message?.role === "user"
         ? message.parts
-            .flatMap((part) => (part.type === "text" ? [part.text] : []))
-            .join(" ")
-            .trim()
+          .flatMap((part) => (part.type === "text" ? [part.text] : []))
+          .join(" ")
+          .trim()
         : "";
 
     let webSearchContext = "";
@@ -400,13 +400,14 @@ export async function POST(request: Request) {
           },
         });
 
-  /*-------LLM Chat response moderation-------------*/
+        /*-------LLM Chat response moderation-------------*/
         console.log("\nModel message moderation")
         const responseText = await result.text;
-        if (await isFlagged(responseText, session, id)){
-          return new ChatbotError("forbidden:moderation").toResponse();
+        if (await isFlagged(responseText, session, id)) {
+          throw new ChatbotError("forbidden:moderation");
         }
- /*----THIS IS WHERE LLM CHAT GETS DISPLAYED------*/
+        
+        /*----THIS IS WHERE LLM CHAT GETS DISPLAYED------*/
         dataStream.merge(
           toUIMessageStream({
             sendReasoning: isReasoningModel,
