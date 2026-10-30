@@ -63,6 +63,7 @@
     "openai": "^7.45.1",
     "orderedmap": "^2.1.1",
     "papaparse": "^5.5.4",
+    "pdf-parse": "^2.4.5",
     "postgres": "^3.4.9",
     "prosemirror-example-setup": "^1.2.3",
     "prosemirror-inputrules": "^1.5.1",

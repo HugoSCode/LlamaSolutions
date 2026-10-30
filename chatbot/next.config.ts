@@ -49,6 +49,7 @@ const nextConfig: NextConfig = {
   },
   poweredByHeader: false,
   reactCompiler: true,
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
 };
 
 export default withBotId(nextConfig);

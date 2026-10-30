@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { FileTextIcon } from "lucide-react";
 import type { Attachment } from "@/lib/types";
 import { Spinner } from "../ui/spinner";
 import { CrossSmallIcon } from "./icons";
@@ -19,7 +20,7 @@ export const PreviewAttachment = ({
       className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border/40 bg-muted"
       data-testid="input-attachment-preview"
     >
-      {contentType?.startsWith("image") ? (
+      {contentType?.startsWith("image") && url ? (
         <Image
           alt={name ?? "attachment"}
           className="size-full object-cover"
@@ -28,8 +29,9 @@ export const PreviewAttachment = ({
           width={96}
         />
       ) : (
-        <div className="flex size-full items-center justify-center text-muted-foreground text-xs">
-          File
+        <div className="flex size-full flex-col items-center justify-center gap-1 px-1 text-muted-foreground text-[10px]">
+          <FileTextIcon className="size-5" />
+          <span className="max-w-full truncate">{name}</span>
         </div>
       )}
 

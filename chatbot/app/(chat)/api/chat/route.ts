@@ -226,24 +226,45 @@ export async function POST(request: Request) {
     const isReasoningModel = capabilities?.reasoning === true;
     const supportsTools = capabilities?.tools === true;
 
-    const modelMessages = await convertToModelMessages(uiMessages);
-
-    const userQuery =
-      message?.role === "user"
-        ? message.parts
-          .flatMap((part) => (part.type === "text" ? [part.text] : []))
-          .join(" ")
-          .trim()
-        : "";
-
-    let webSearchContext = "";
-    if (webSearchEnabled && userQuery) {
-      const fetchedWebSearch = await fetchWebSearchContext(userQuery);
-      webSearchContext = fetchedWebSearch.context;
+const uiMessagesWithPdfText = uiMessages.map((m) => ({
+  ...m,
+  parts: m.parts.map((p) => {
+    if ((p.type as string) === "data-pdf-context") {
+      const d = (p as unknown as { data: { name?: string; text?: string } })
+        .data;
+      return {
+        type: "text" as const,
+        text: `[Attached PDF: ${d?.name ?? "file"}]\n${d?.text ?? ""}`,
+      };
     }
+    return p;
+  }),
+})) as typeof uiMessages;
 
-    const refuseLiveGuess = !webSearchEnabled && needsLiveInfo(userQuery);
+const modelMessages = await convertToModelMessages(uiMessagesWithPdfText);
 
+const hasPdfAttachment = uiMessages.some((m) =>
+  m.parts.some((p) => (p.type as string) === "data-pdf-context")
+);
+
+const userQuery =
+  message?.role === "user"
+    ? message.parts
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join(" ")
+        .trim()
+    : "";
+
+let webSearchContext = "";
+if (webSearchEnabled && userQuery) {
+  const fetchedWebSearch = await fetchWebSearchContext(userQuery);
+  webSearchContext = fetchedWebSearch.context;
+}
+
+const refuseLiveGuess =
+  !webSearchEnabled && !hasPdfAttachment && needsLiveInfo(userQuery);
+  console.log("===============================================================================")
+console.log("webSearchEnabled:", webSearchEnabled);
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (refuseLiveGuess) {
@@ -347,7 +368,7 @@ export async function POST(request: Request) {
                 "webSearch",
 
               ],
-          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled ? "" : webSearchOffPrompt}${webSearchContext}`,
+          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled || hasPdfAttachment ? "" : webSearchOffPrompt}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {
