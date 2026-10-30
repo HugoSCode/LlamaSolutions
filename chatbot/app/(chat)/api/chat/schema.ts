@@ -12,7 +12,20 @@ const filePartSchema = z.object({
   url: z.string().min(1),
 });
 
-const partSchema = z.union([textPartSchema, filePartSchema]);
+const pdfContextPartSchema = z.object({
+  data: z.object({
+    id: z.uuid(),
+    name: z.string().min(1).max(200),
+    text: z.string().min(1).max(80_000),
+  }),
+  type: z.literal("data-pdf-context"),
+});
+
+const partSchema = z.union([
+  textPartSchema,
+  filePartSchema,
+  pdfContextPartSchema,
+]);
 
 const userMessageSchema = z.object({
   id: z.uuid(),
@@ -33,6 +46,7 @@ export const postRequestBodySchema = z.object({
   persist: z.boolean().optional().default(true),
   selectedChatModel: z.string(),
   selectedVisibilityType: z.enum(["public", "private"]),
+  webSearch: z.boolean().optional().default(false),
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

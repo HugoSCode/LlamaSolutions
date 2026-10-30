@@ -112,6 +112,9 @@ const PurePreviewMessage = ({
   const attachmentsFromMessage = message.parts.filter(
     (part) => part.type === "file"
   );
+  const pdfAttachments = message.parts.filter(
+    (part) => part.type === "data-pdf-context"
+  );
 
   useDataStream();
 
@@ -128,7 +131,7 @@ const PurePreviewMessage = ({
   );
   const isThinking = isAssistant && isLoading && !hasAnyContent;
 
-  const attachments = attachmentsFromMessage.length > 0 && (
+  const attachments = (attachmentsFromMessage.length > 0 || pdfAttachments.length > 0) && (
     <div
       className="flex flex-row justify-end gap-2"
       data-testid={"message-attachments"}
@@ -141,6 +144,16 @@ const PurePreviewMessage = ({
             url: attachment.url,
           }}
           key={attachment.url}
+        />
+      ))}
+      {pdfAttachments.map((part) => (
+        <PreviewAttachment
+          attachment={{
+            contentType: "application/pdf",
+            name: part.data.name,
+            url: `pdf:${part.data.id}`,
+          }}
+          key={part.data.id}
         />
       ))}
     </div>
@@ -191,6 +204,10 @@ const PurePreviewMessage = ({
           <MessageResponse>{sanitizeText(part.text)}</MessageResponse>
         </MessageContent>
       );
+    }
+
+    if (type === "data-pdf-context") {
+      return null;
     }
 
     if (isSearchToolType(part.type)) {
