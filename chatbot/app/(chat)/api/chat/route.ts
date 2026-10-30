@@ -12,7 +12,7 @@ import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
-import { fetchWebSearchContext } from "@/lib/ai/duckduckgo";
+import { fetchSearchContext } from "@/lib/ai/serper-context";
 import {
   LIVE_INFO_NOTICE,
   needsLiveInfo,
@@ -257,14 +257,13 @@ const userQuery =
 
 let webSearchContext = "";
 if (webSearchEnabled && userQuery) {
-  const fetchedWebSearch = await fetchWebSearchContext(userQuery);
-  webSearchContext = fetchedWebSearch.context;
+const fetchedWebSearch = await fetchSearchContext(userQuery);
+webSearchContext = fetchedWebSearch.context;
 }
 
 const refuseLiveGuess =
   !webSearchEnabled && !hasPdfAttachment && needsLiveInfo(userQuery);
   console.log("===============================================================================")
-console.log("webSearchEnabled:", webSearchEnabled);
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (refuseLiveGuess) {
@@ -490,6 +489,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
         }
       },
       onError: (error) => {
+        console.error("chat stream error:", error);
         if (
           error instanceof Error &&
           error.message?.includes(
