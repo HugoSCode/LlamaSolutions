@@ -1,9 +1,12 @@
 import { put } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { PDFParse } from "pdf-parse";
+import { extractText, getDocumentProxy } from "unpdf";
 
 import { auth } from "@/app/(auth)/auth";
+
+export const runtime = "nodejs";
+export const maxDuration = 30;
 
 const FileSchema = z.object({
   file: z
@@ -56,18 +59,21 @@ export async function POST(request: Request) {
         );
       }
 
-      const parser = new PDFParse({ data: Buffer.from(await file.arrayBuffer()) });
       try {
-        const info = await parser.getInfo();
-        if (info.total > MAX_PDF_PAGES) {
+        const pdf = await getDocumentProxy(
+          new Uint8Array(await file.arrayBuffer())
+        );
+
+        if (pdf.numPages > MAX_PDF_PAGES) {
           return NextResponse.json(
             { error: "PDFs must contain 100 pages or fewer" },
             { status: 400 }
           );
         }
 
-        const result = await parser.getText();
-        const extractedText = result.text.trim();
+        const { text } = await extractText(pdf, { mergePages: true });
+        const extractedText = text.trim();
+
         if (!extractedText) {
           return NextResponse.json(
             { error: "No selectable text found. Scanned PDFs are not supported yet." },
@@ -96,8 +102,6 @@ export async function POST(request: Request) {
           { error: "Could not read this PDF. Check that the file is valid and not password-protected." },
           { status: 400 }
         );
-      } finally {
-        await parser.destroy();
       }
     }
 
