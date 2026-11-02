@@ -2,13 +2,39 @@ export const LIVE_INFO_NOTICE =
   "I can't access live data while Web search is off, so I won't guess. Turn on Web search with the globe button, then ask again for an up-to-date answer.";
 
 export const webSearchOffPrompt = `
-Web search is OFF for this turn. You cannot see the live web, news, prices, weather, or who holds an office today.
-If the question depends on information that can change — current officeholders, news, prices, weather, sports results, or anything about today, latest, or recent events — do NOT guess, estimate, or invent names, numbers, dates, or scores. Do not call search or weather tools for it.
+Web search is OFF for this turn. You cannot see the live web, news, prices, weather, scores, or who holds an office today. No search tools are available, so do not call webSearch, searchNews, or any other lookup tool.
+If the question depends on information that can change — current officeholders, news, prices, weather, sports results, or anything about today, latest, or recent events — do NOT guess, estimate, or invent names, numbers, dates, scores, headlines, or what just happened.
+Never invent recent events. Never invent source links, URLs, citations, or news outlets, and never write a fake https link or attribute a recent event to a source you were not given.
 Reply with only this message:
 ${LIVE_INFO_NOTICE}
-Answer general knowledge, history, explanations, math, coding, and writing normally.`;
+Answer general knowledge, history, explanations, math, coding, and writing normally, without pretending you looked anything up.`;
 
-const HISTORICAL_YEAR = /\b(?:1\d{3}|20[0-1]\d|202[0-3])\b/;
+const NON_SEARCH_TOOL_NAMES = [
+  "getWeather",
+  "createDocument",
+  "editDocument",
+  "updateDocument",
+  "requestSuggestions",
+] as const;
+
+type NonSearchToolName = (typeof NON_SEARCH_TOOL_NAMES)[number];
+
+export function activeToolNames({
+  webSearchEnabled,
+  isReasoningModel,
+  supportsTools,
+}: {
+  webSearchEnabled: boolean;
+  isReasoningModel: boolean;
+  supportsTools: boolean;
+}): readonly NonSearchToolName[] {
+  if (webSearchEnabled || (isReasoningModel && !supportsTools)) {
+    return [];
+  }
+  return NON_SEARCH_TOOL_NAMES;
+}
+
+const HISTORICAL_YEAR = /\b(?:1\d{3}|20[0-1]\d|202[0-3])s?\b/;
 
 const RECENCY_WORD =
   /\b(?:latest|today|tonight|yesterday|right now|as of now|this week|this weekend|this month|recent(?:ly)?|breaking|up to date|just announced|just happened)\b/;
@@ -17,7 +43,19 @@ const OFFICE =
   /\b(?:prime ministers?|presidents?|chancellors?|premiers?|governors?|mayors?|popes?|monarchs?|kings?|queens?|ceos?|chief executives?|heads? of state|heads? of government)\b/;
 
 const ASKING =
-  /\b(?:who(?:'s| is| are)?|what(?:'s| is| are)?|when|where|which|tell me|update)\b/;
+  /\b(?:who(?:'s|s| is| are)?|what(?:'s|s| is| are)?|when|where|which|tell me|updates?)\b/;
+
+const NAMED_HISTORICAL_EVENT =
+  /\b(?:battle of|siege of|wars? of|world wars?|civil wars?|treaty of|revolution|empire|ancient|medieval|centur(?:y|ies)|dynasty)\b/;
+
+const OPEN_LIVE_QUESTION =
+  /\b(?:what(?:'s|s| is| has)? happened|what(?:'s|s| is) happening|what(?:'s|s| has) been happening|what(?:'s|s| is) going on|(?:any |got any |are there any )?updates?(?: on| about)|current events?|current affairs|current situation|current news)\b/;
+
+const RECENCY_CUE =
+  /\b(?:recently|this week|yesterday|tonight|right now|latest)\b/;
+
+const NON_NEWS_BREAKING =
+  /\bbreaking (?:changes?|down|up|into|out|point|bad)\b/;
 
 function normalizeQuestion(text: string): string {
   return text
@@ -28,8 +66,16 @@ function normalizeQuestion(text: string): string {
     .trim();
 }
 
+function isNamedHistoricalEvent(question: string): boolean {
+  return (
+    NAMED_HISTORICAL_EVENT.test(question) &&
+    !RECENCY_WORD.test(question) &&
+    !/\bcurrent\b/.test(question)
+  );
+}
+
 function isClearlyHistorical(question: string): boolean {
-  if (/\bwho (?:was|were)\b/.test(question)) {
+  if (/\bwho (?:was|were)\b/.test(question) && !RECENCY_WORD.test(question)) {
     return true;
   }
   if (
@@ -38,6 +84,9 @@ function isClearlyHistorical(question: string): boolean {
     ) &&
     !RECENCY_WORD.test(question)
   ) {
+    return true;
+  }
+  if (isNamedHistoricalEvent(question)) {
     return true;
   }
   return (
@@ -188,16 +237,26 @@ function asksRecentEvent(question: string): boolean {
   if (/\brecent events?\b/.test(question)) {
     return true;
   }
-  if (/\bwhat happened\b/.test(question) && RECENCY_WORD.test(question)) {
+  if (/\bbreaking\b/.test(question) && !NON_NEWS_BREAKING.test(question)) {
     return true;
   }
-  if (/\b(?:what(?:'s| is)|tell me) the latest\b/.test(question)) {
+  if (OPEN_LIVE_QUESTION.test(question)) {
+    return true;
+  }
+  if (
+    RECENCY_CUE.test(question) &&
+    (ASKING.test(question) ||
+      /\b(?:news|updates?|happened|happening|breaking)\b/.test(question))
+  ) {
+    return true;
+  }
+  if (/\b(?:what(?:'s|s| is)|tell me|give me) the latest\b/.test(question)) {
     return true;
   }
   return (
     RECENCY_WORD.test(question) &&
     ASKING.test(question) &&
-    /\b(?:happened|happening|winner|elected|appointed|result|update|news|score|price|weather)\b/.test(
+    /\b(?:happened|happening|going on|winner|elected|appointed|result|updates?|news|score|price|weather|situation|affairs)\b/.test(
       question
     )
   );
