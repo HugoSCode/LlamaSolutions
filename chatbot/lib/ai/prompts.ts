@@ -73,9 +73,11 @@ About the origin of user's request:
 export const systemPrompt = ({
   requestHints,
   supportsTools,
+  liveSearch = true,
 }: {
   requestHints: RequestHints;
   supportsTools: boolean;
+  liveSearch?: boolean;
 }) => {
   const requestPrompt = getRequestPromptFromHints(requestHints);
 
@@ -83,7 +85,9 @@ export const systemPrompt = ({
     return `${regularPrompt}\n\n${requestPrompt}`;
   }
 
-  return `${regularPrompt}\n\n${liveSearchPrompt}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
+  const searchSection = liveSearch ? `\n\n${liveSearchPrompt}` : "";
+
+  return `${regularPrompt}${searchSection}\n\n${requestPrompt}\n\n${artifactsPrompt}`;
 };
 
 export const codePrompt = `
