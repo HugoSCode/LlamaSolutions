@@ -15,6 +15,7 @@ import { auth, type UserType } from "@/app/(auth)/auth";
 import { fetchSearchContext } from "@/lib/ai/serper-context";
 import {
   LIVE_INFO_NOTICE,
+  activeToolNames,
   needsLiveInfo,
   webSearchOffPrompt,
 } from "@/lib/ai/live-info";
@@ -355,19 +356,16 @@ const refuseLiveGuess =
         };
 
         const result = streamText({
-          activeTools:
-            webSearchEnabled || (isReasoningModel && !supportsTools)
-              ? []
-              : [
-                "getWeather",
-                "createDocument",
-                "editDocument",
-                "updateDocument",
-                "requestSuggestions",
-                "webSearch",
-
-              ],
-          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled || hasPdfAttachment ? "" : webSearchOffPrompt}${webSearchContext}`,
+          activeTools: activeToolNames({
+            isReasoningModel,
+            supportsTools,
+            webSearchEnabled,
+          }),
+          instructions: `${systemPrompt({
+            liveSearch: webSearchEnabled || hasPdfAttachment,
+            requestHints,
+            supportsTools,
+          })}${webSearchEnabled || hasPdfAttachment ? "" : webSearchOffPrompt}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {
@@ -416,7 +414,7 @@ const refuseLiveGuess =
               modelId: chatModel,
               session,
             }),
-            webSearch,
+            ...(webSearchEnabled ? { webSearch } : {}),
           },
         });
 

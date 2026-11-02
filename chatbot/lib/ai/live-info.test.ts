@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LIVE_INFO_NOTICE, needsLiveInfo } from "./live-info";
+import {
+  activeToolNames,
+  LIVE_INFO_NOTICE,
+  needsLiveInfo,
+  webSearchOffPrompt,
+} from "./live-info";
+import { systemPrompt } from "./prompts";
 
 describe("needsLiveInfo", () => {
   it("catches current officeholders", () => {
@@ -30,6 +36,49 @@ describe("needsLiveInfo", () => {
     assert.equal(needsLiveInfo("tell me the latest"), true);
   });
 
+  it("catches open live questions that do not name a date", () => {
+    const liveQuestions = [
+      "give me the latest news from australia",
+      "what happened in australia",
+      "What happened in Australia?",
+      "what's happening",
+      "what's happening in australia",
+      "what is happening",
+      "what's going on in australia",
+      "what's going on",
+      "any updates on the fires",
+      "any updates on australia",
+      "what happened recently",
+      "what happened this week",
+      "what happened yesterday",
+      "what's happening tonight",
+      "what's happening right now",
+      "what's the latest",
+      "current events in australia",
+      "breaking news from australia",
+      "what's breaking in australia",
+    ];
+
+    for (const question of liveQuestions) {
+      assert.equal(needsLiveInfo(question), true, question);
+    }
+  });
+
+  it("still answers history and general 'what happened' questions", () => {
+    const historyQuestions = [
+      "what happened in 1945",
+      "What happened in 1945?",
+      "what happened at the battle of Hastings",
+      "What happened at the Battle of Hastings?",
+      "what happened during World War II",
+      "what happened in the Roman Empire",
+    ];
+
+    for (const question of historyQuestions) {
+      assert.equal(needsLiveInfo(question), false, question);
+    }
+  });
+
   it("leaves general knowledge, history, and tasks alone", () => {
     assert.equal(needsLiveInfo("what is a prime minister"), false);
     assert.equal(
@@ -50,6 +99,11 @@ describe("needsLiveInfo", () => {
     assert.equal(needsLiveInfo("hello"), false);
     assert.equal(needsLiveInfo("what is 2 + 2"), false);
     assert.equal(needsLiveInfo(""), false);
+    assert.equal(needsLiveInfo("I recently learned to bake bread"), false);
+    assert.equal(
+      needsLiveInfo("what are the breaking changes in react"),
+      false
+    );
   });
 });
 
@@ -58,5 +112,60 @@ describe("LIVE_INFO_NOTICE", () => {
     assert.match(LIVE_INFO_NOTICE, /can't access live data/);
     assert.match(LIVE_INFO_NOTICE, /globe button/);
     assert.match(LIVE_INFO_NOTICE, /won't guess/);
+  });
+});
+
+describe("webSearchOffPrompt", () => {
+  it("forbids invented recent events and source links", () => {
+    assert.match(webSearchOffPrompt, /Never invent recent events/);
+    assert.match(webSearchOffPrompt, /Never invent source links/);
+    assert.match(webSearchOffPrompt, /fake https link/);
+    assert.match(webSearchOffPrompt, /No search tools are available/);
+    assert.match(webSearchOffPrompt, /can't access live data/);
+  });
+});
+
+describe("activeToolNames", () => {
+  it("includes no search tools when the globe is off", () => {
+    const names: readonly string[] = activeToolNames({
+      isReasoningModel: false,
+      supportsTools: true,
+      webSearchEnabled: false,
+    });
+
+    assert.equal(names.includes("webSearch"), false);
+    assert.equal(names.includes("searchNews"), false);
+    assert.equal(names.includes("getWeather"), true);
+    assert.equal(names.includes("createDocument"), true);
+  });
+
+  it("clears tools when the globe is on because search is injected as context", () => {
+    assert.deepEqual(
+      activeToolNames({
+        isReasoningModel: false,
+        supportsTools: true,
+        webSearchEnabled: true,
+      }),
+      []
+    );
+  });
+});
+
+describe("systemPrompt", () => {
+  it("does not instruct the model to call search or cite links when search is off", () => {
+    const prompt = systemPrompt({
+      liveSearch: false,
+      requestHints: {
+        city: "Dunedin",
+        country: "NZ",
+        latitude: "-45.87",
+        longitude: "170.50",
+      },
+      supportsTools: true,
+    });
+
+    assert.equal(prompt.includes("call webSearch"), false);
+    assert.equal(prompt.includes("call searchNews"), false);
+    assert.equal(prompt.includes("include the source links"), false);
   });
 });
