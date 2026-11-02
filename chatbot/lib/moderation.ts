@@ -38,7 +38,7 @@ export async function isFlagged(text: string, session: any, id: string) {
     const answer = decision.answers[0];
 
     if (answer.type === "choice" && answer.choice !== "safe") {
-      console.warn(`Flagged message: ${text}\nDecision: ${JSON.stringify(decision)}\nuserId: ${session.user.id}, chatId: ${id}, ts: ${Date.now()}\n\n`)
+      console.warn(`Flagged message: ${text}\nCategory: ${JSON.stringify(answer.choice)}\nuserId: ${session.user.id}, chatId: ${id}, Log date: ${new Date(Date.now()).toISOString()}\n\n`)
       return true;
     } else {
       return false;
