@@ -12,10 +12,13 @@ import { checkBotId } from "botid/server";
 import { after } from "next/server";
 import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
+import { selectActiveTools } from "@/lib/ai/active-tools";
 import { fetchWebSearchContext } from "@/lib/ai/duckduckgo";
 import {
+  hasUploadedDocument,
   LIVE_INFO_NOTICE,
   needsLiveInfo,
+  uploadedDocumentPrompt,
   webSearchOffPrompt,
 } from "@/lib/ai/live-info";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
@@ -240,7 +243,14 @@ export async function POST(request: Request) {
       webSearchContext = fetchedWebSearch.context;
     }
 
-    const refuseLiveGuess = !webSearchEnabled && needsLiveInfo(userQuery);
+    const uploadedDocument = hasUploadedDocument(uiMessages);
+    const refuseLiveGuess =
+      !webSearchEnabled &&
+      !uploadedDocument &&
+      needsLiveInfo(userQuery);
+    const uploadedDocumentContext = uploadedDocument
+      ? uploadedDocumentPrompt
+      : "";
 
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
@@ -332,20 +342,14 @@ export async function POST(request: Request) {
           clearHealthCheckTimer();
         };
 
+        const activeTools = selectActiveTools({
+          isReasoningModel,
+          supportsTools,
+          webSearchEnabled,
+        });
         const result = streamText({
-          activeTools:
-            webSearchEnabled || (isReasoningModel && !supportsTools)
-              ? []
-              : [
-                "getWeather",
-                "createDocument",
-                "editDocument",
-                "updateDocument",
-                "requestSuggestions",
-                "webSearch",
-
-              ],
-          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled ? "" : webSearchOffPrompt}${webSearchContext}`,
+          activeTools,
+          instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled ? "" : webSearchOffPrompt}${uploadedDocumentContext}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
           onAbort() {
@@ -393,7 +397,7 @@ export async function POST(request: Request) {
               modelId: chatModel,
               session,
             }),
-            webSearch,
+            ...(webSearchEnabled ? { webSearch } : {}),
           },
         });
 

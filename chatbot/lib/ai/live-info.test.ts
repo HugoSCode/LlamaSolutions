@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { LIVE_INFO_NOTICE, needsLiveInfo } from "./live-info";
+import {
+  hasUploadedDocument,
+  LIVE_INFO_NOTICE,
+  needsLiveInfo,
+} from "./live-info";
 
 describe("needsLiveInfo", () => {
   it("catches current officeholders", () => {
@@ -50,6 +54,57 @@ describe("needsLiveInfo", () => {
     assert.equal(needsLiveInfo("hello"), false);
     assert.equal(needsLiveInfo("what is 2 + 2"), false);
     assert.equal(needsLiveInfo(""), false);
+  });
+});
+
+describe("needsLiveInfo with an attachment", () => {
+  it("does not fire when the chat has an uploaded file", () => {
+    assert.equal(
+      needsLiveInfo("What happened in Palm Beach County?", {
+        hasUploadedDocument: true,
+      }),
+      false
+    );
+    assert.equal(
+      needsLiveInfo("what happened today in Ukraine", {
+        hasUploadedDocument: true,
+      }),
+      false
+    );
+    assert.equal(needsLiveInfo("what happened today in Ukraine"), true);
+  });
+});
+
+describe("hasUploadedDocument", () => {
+  it("is true for a file part on this message or an earlier one", () => {
+    assert.equal(
+      hasUploadedDocument([
+        {
+          parts: [
+            { type: "file" },
+            { text: "What happened in Palm Beach County?", type: "text" },
+          ],
+        },
+      ]),
+      true
+    );
+    assert.equal(
+      hasUploadedDocument([
+        { parts: [{ type: "file" }] },
+        { parts: [{ text: "and this follow-up?", type: "text" }] },
+      ]),
+      true
+    );
+    assert.equal(
+      hasUploadedDocument([
+        {
+          parts: [
+            { text: "What happened in Palm Beach County?", type: "text" },
+          ],
+        },
+      ]),
+      false
+    );
   });
 });
 

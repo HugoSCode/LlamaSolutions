@@ -6,7 +6,26 @@ Web search is OFF for this turn. You cannot see the live web, news, prices, weat
 If the question depends on information that can change — current officeholders, news, prices, weather, sports results, or anything about today, latest, or recent events — do NOT guess, estimate, or invent names, numbers, dates, or scores. Do not call search or weather tools for it.
 Reply with only this message:
 ${LIVE_INFO_NOTICE}
-Answer general knowledge, history, explanations, math, coding, and writing normally.`;
+Answer general knowledge, history, explanations, math, coding, and writing normally.
+The webSearch and searchNews tools are not available on this turn. Do not call them.`;
+
+export const uploadedDocumentPrompt = `
+The user attached a file in this chat. Answer from that file's content first. Do not search the web, and do not invent facts that are not in the file. If the file does not contain the answer, say so.`;
+
+export function hasUploadedDocument(
+  messages: ReadonlyArray<{
+    parts?: ReadonlyArray<{ type?: string; [key: string]: unknown }>;
+  }>
+): boolean {
+  for (const message of messages) {
+    for (const part of message.parts ?? []) {
+      if (part.type === "file") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 const HISTORICAL_YEAR = /\b(?:1\d{3}|20[0-1]\d|202[0-3])\b/;
 
@@ -203,7 +222,13 @@ function asksRecentEvent(question: string): boolean {
   );
 }
 
-export function needsLiveInfo(text: string): boolean {
+export function needsLiveInfo(
+  text: string,
+  options?: { hasUploadedDocument?: boolean }
+): boolean {
+  if (options?.hasUploadedDocument) {
+    return false;
+  }
   const question = normalizeQuestion(text);
   if (!question) {
     return false;
