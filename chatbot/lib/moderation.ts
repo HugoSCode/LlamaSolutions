@@ -38,10 +38,7 @@ export async function isFlagged(text: string, session: any, id: string) {
     const answer = decision.answers[0];
 
     if (answer.type === "choice" && answer.choice !== "safe") {
-      fs.appendFileSync(
-        "moderation.log",
-        `Flagged message: ${text}\nDecision: ${JSON.stringify(decision)}\nuserId: ${session.user.id}, chatId: ${id}, ts: ${Date.now()}\n\n`
-      );
+      console.warn(`Flagged message: ${text}\nDecision: ${JSON.stringify(decision)}\nuserId: ${session.user.id}, chatId: ${id}, ts: ${Date.now()}\n\n`)
       return true;
     } else {
       return false;
