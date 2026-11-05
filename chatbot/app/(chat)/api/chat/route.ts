@@ -128,7 +128,7 @@ export async function POST(request: Request) {
       return new ChatbotError("rate_limit:chat").toResponse();
     }
 
-    const isToolApprovalFlow = Boolean(messages);
+    const isToolApprovalFlow = Boolean(message?.role !== "user" && Boolean(messages?.length));
     if (message?.role === "user") {
       const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
 
