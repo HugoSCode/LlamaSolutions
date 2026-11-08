@@ -57,14 +57,13 @@ import { type PostRequestBody, postRequestBodySchema } from "./schema";
 import { appendFile } from "node:fs/promises";
 import { isFlagged } from "@/lib/moderation";
 
-
 export const maxDuration = 60;
 
 const HEALTH_CHECK_DELAY_MS = 9000;
 
 function isModelStreamActivity(chunk: { type: string }) {
   return !["start", "start-step", "finish-step", "finish", "raw"].includes(
-    chunk.type
+    chunk.type,
   );
 }
 
@@ -96,8 +95,12 @@ export async function POST(request: Request) {
       selectedChatModel,
       selectedVisibilityType,
       webSearch: webSearchEnabled,
+      persist,
     } = requestBody;
 
+    if (!persist && !messages?.length) {
+      return new ChatbotError("bad_request:api").toResponse();
+    }
     const [botIdResult, session] = await Promise.all([
       checkBotId().catch(() => null),
       auth(),
@@ -128,18 +131,22 @@ export async function POST(request: Request) {
       return new ChatbotError("rate_limit:chat").toResponse();
     }
 
-    const isToolApprovalFlow = Boolean(message?.role !== "user" && Boolean(messages?.length));
+    const isToolApprovalFlow = Boolean(
+      message?.role !== "user" && Boolean(messages?.length),
+    );
     if (message?.role === "user") {
-      const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join(" ");
+      const text = message.parts
+        .map((p) => (p.type === "text" ? p.text : ""))
+        .join(" ");
 
       /*---MODERATION---*/
-      console.log('\nUser message moderation:')
+      console.log("\nUser message moderation:");
       if (await isFlagged(text, session, id)) {
         return new ChatbotError("forbidden:moderation").toResponse();
       }
     }
 
-    const chat = await getChatById({ id });
+    const chat = persist ? await getChatById({ id }) : null;
     let messagesFromDb: DBMessage[] = [];
     let titlePromise: Promise<string> | null = null;
 
@@ -149,18 +156,24 @@ export async function POST(request: Request) {
       }
       messagesFromDb = await getMessagesByChatId({ id });
     } else if (message?.role === "user") {
-      await saveChat({
-        id,
-        title: "New chat",
-        userId: session.user.id,
-        visibility: selectedVisibilityType,
-      });
-      titlePromise = generateTitleFromUserMessage({ message });
+      if (persist) {
+        await saveChat({
+          id,
+          title: "New chat",
+          userId: session.user.id,
+          visibility: selectedVisibilityType,
+        });
+      }
+      if (persist || (messages?.length ?? 0) <= 1) {
+        titlePromise = generateTitleFromUserMessage({ message });
+      }
     }
 
     let uiMessages: ChatMessage[];
 
-    if (isToolApprovalFlow && messages) {
+    if (!persist) {
+      uiMessages = messages as ChatMessage[];
+    } else if (isToolApprovalFlow && messages) {
       const dbMessages = convertToUIMessages(messagesFromDb);
       const approvalStates = new Map(
         messages.flatMap(
@@ -169,13 +182,13 @@ export async function POST(request: Request) {
               ?.filter(
                 (p: Record<string, unknown>) =>
                   p.state === "approval-responded" ||
-                  p.state === "output-denied"
+                  p.state === "output-denied",
               )
               .map((p: Record<string, unknown>) => [
                 String(p.toolCallId ?? ""),
                 p,
-              ]) ?? []
-        )
+              ]) ?? [],
+        ),
       );
       uiMessages = dbMessages.map((msg) => ({
         ...msg,
@@ -205,7 +218,7 @@ export async function POST(request: Request) {
       longitude,
     };
 
-    if (message?.role === "user") {
+    if (persist && message?.role === "user") {
       await saveMessages({
         messages: [
           {
@@ -226,45 +239,47 @@ export async function POST(request: Request) {
     const isReasoningModel = capabilities?.reasoning === true;
     const supportsTools = capabilities?.tools === true;
 
-const uiMessagesWithPdfText = uiMessages.map((m) => ({
-  ...m,
-  parts: m.parts.map((p) => {
-    if ((p.type as string) === "data-pdf-context") {
-      const d = (p as unknown as { data: { name?: string; text?: string } })
-        .data;
-      return {
-        type: "text" as const,
-        text: `[Attached PDF: ${d?.name ?? "file"}]\n${d?.text ?? ""}`,
-      };
+    const uiMessagesWithPdfText = uiMessages.map((m) => ({
+      ...m,
+      parts: m.parts.map((p) => {
+        if ((p.type as string) === "data-pdf-context") {
+          const d = (p as unknown as { data: { name?: string; text?: string } })
+            .data;
+          return {
+            type: "text" as const,
+            text: `[Attached PDF: ${d?.name ?? "file"}]\n${d?.text ?? ""}`,
+          };
+        }
+        return p;
+      }),
+    })) as typeof uiMessages;
+
+    const modelMessages = await convertToModelMessages(uiMessagesWithPdfText);
+
+    const hasPdfAttachment = uiMessages.some((m) =>
+      m.parts.some((p) => (p.type as string) === "data-pdf-context"),
+    );
+
+    const userQuery =
+      message?.role === "user"
+        ? message.parts
+            .flatMap((part) => (part.type === "text" ? [part.text] : []))
+            .join(" ")
+            .trim()
+        : "";
+
+    let webSearchContext = "";
+    if (webSearchEnabled && userQuery) {
+      const fetchedWebSearch = await fetchWebSearchContext(userQuery);
+      webSearchContext = fetchedWebSearch.context;
     }
-    return p;
-  }),
-})) as typeof uiMessages;
 
-const modelMessages = await convertToModelMessages(uiMessagesWithPdfText);
-
-const hasPdfAttachment = uiMessages.some((m) =>
-  m.parts.some((p) => (p.type as string) === "data-pdf-context")
-);
-
-const userQuery =
-  message?.role === "user"
-    ? message.parts
-        .flatMap((part) => (part.type === "text" ? [part.text] : []))
-        .join(" ")
-        .trim()
-    : "";
-
-let webSearchContext = "";
-if (webSearchEnabled && userQuery) {
-  const fetchedWebSearch = await fetchWebSearchContext(userQuery);
-  webSearchContext = fetchedWebSearch.context;
-}
-
-const refuseLiveGuess =
-  !webSearchEnabled && !hasPdfAttachment && needsLiveInfo(userQuery);
-  console.log("===============================================================================")
-console.log("webSearchEnabled:", webSearchEnabled);
+    const refuseLiveGuess =
+      !webSearchEnabled && !hasPdfAttachment && needsLiveInfo(userQuery);
+    console.log(
+      "===============================================================================",
+    );
+    console.log("webSearchEnabled:", webSearchEnabled);
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (refuseLiveGuess) {
@@ -285,7 +300,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
             try {
               const title = await titlePromise;
               dataStream.write({ data: title, type: "data-chat-title" });
-              updateChatTitleById({ chatId: id, title });
+              if (persist) updateChatTitleById({ chatId: id, title });
             } catch {
               /* non-fatal */
             }
@@ -305,7 +320,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
 
         const writeWaitingStatus = (
           phase: WaitingStatusData["phase"],
-          messageText: string
+          messageText: string,
         ) => {
           if (hasModelActivity && phase !== "thinking") {
             return;
@@ -330,7 +345,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
               if (availability === "impacted") {
                 writeWaitingStatus(
                   "health",
-                  `${modelName} may be slow or unavailable right now...`
+                  `${modelName} may be slow or unavailable right now...`,
                 );
               } else {
                 writeWaitingStatus("still-waiting", "Still waiting...");
@@ -359,15 +374,16 @@ console.log("webSearchEnabled:", webSearchEnabled);
           activeTools:
             webSearchEnabled || (isReasoningModel && !supportsTools)
               ? []
-              : [
-                "getWeather",
-                "createDocument",
-                "editDocument",
-                "updateDocument",
-                "requestSuggestions",
-                "webSearch",
-
-              ],
+              : persist
+                ? [
+                    "getWeather",
+                    "createDocument",
+                    "editDocument",
+                    "updateDocument",
+                    "requestSuggestions",
+                    "webSearch",
+                  ]
+                : ["getWeather", "webSearch"],
           instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled || hasPdfAttachment ? "" : webSearchOffPrompt}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
@@ -422,25 +438,25 @@ console.log("webSearchEnabled:", webSearchEnabled);
         });
 
         /*-------LLM Chat response moderation-------------*/
-        console.log("\nModel message moderation")
+        console.log("\nModel message moderation");
         const responseText = await result.text;
         if (await isFlagged(responseText, session, id)) {
           throw new ChatbotError("forbidden:moderation");
         }
-        
+
         /*----THIS IS WHERE LLM CHAT GETS DISPLAYED------*/
         dataStream.merge(
           toUIMessageStream({
             sendReasoning: isReasoningModel,
             stream: result.stream,
-          })
+          }),
         );
 
         if (titlePromise) {
           try {
             const title = await titlePromise;
             dataStream.write({ data: title, type: "data-chat-title" });
-            updateChatTitleById({ chatId: id, title });
+            if (persist) updateChatTitleById({ chatId: id, title });
           } catch {
             /* non-fatal */
           }
@@ -448,11 +464,12 @@ console.log("webSearchEnabled:", webSearchEnabled);
       },
       generateId: generateUUID,
       onEnd: async ({ messages: finishedMessages }) => {
+        if (!persist) return;
         if (isToolApprovalFlow) {
           await Promise.all(
             finishedMessages.map(async (finishedMsg) => {
               const existingMsg = uiMessages.find(
-                (m) => m.id === finishedMsg.id
+                (m) => m.id === finishedMsg.id,
               );
               if (existingMsg) {
                 await updateMessage({
@@ -474,7 +491,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
                   },
                 ],
               });
-            })
+            }),
           );
         } else if (finishedMessages.length > 0) {
           await saveMessages({
@@ -493,7 +510,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
         if (
           error instanceof Error &&
           error.message?.includes(
-            "AI Gateway requires a valid credit card on file to service requests"
+            "AI Gateway requires a valid credit card on file to service requests",
           )
         ) {
           return "AI Gateway requires a valid credit card on file to service requests. Please visit https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai%3Fmodal%3Dadd-credit-card to add a card and unlock your free credits.";
@@ -505,7 +522,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
 
     return createUIMessageStreamResponse({
       async consumeSseStream({ stream: sseStream }) {
-        if (!process.env.REDIS_URL) {
+        if (!persist || !process.env.REDIS_URL) {
           return;
         }
         try {
@@ -515,7 +532,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
             await createStreamId({ chatId: id, streamId });
             await streamContext.createNewResumableStream(
               streamId,
-              () => sseStream
+              () => sseStream,
             );
           }
         } catch {
@@ -534,7 +551,7 @@ console.log("webSearchEnabled:", webSearchEnabled);
     if (
       error instanceof Error &&
       error.message?.includes(
-        "AI Gateway requires a valid credit card on file to service requests"
+        "AI Gateway requires a valid credit card on file to service requests",
       )
     ) {
       return new ChatbotError("bad_request:activate_gateway").toResponse();
