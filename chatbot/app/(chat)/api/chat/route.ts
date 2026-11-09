@@ -273,13 +273,11 @@ export async function POST(request: Request) {
       const fetchedWebSearch = await fetchWebSearchContext(userQuery);
       webSearchContext = fetchedWebSearch.context;
     }
-
     const refuseLiveGuess =
       !webSearchEnabled && !hasPdfAttachment && needsLiveInfo(userQuery);
     console.log(
       "===============================================================================",
     );
-    console.log("webSearchEnabled:", webSearchEnabled);
     const stream = createUIMessageStream({
       execute: async ({ writer: dataStream }) => {
         if (refuseLiveGuess) {
@@ -369,21 +367,23 @@ export async function POST(request: Request) {
           hasModelActivity = true;
           clearHealthCheckTimer();
         };
+        const toolsAllowed = !(isReasoningModel && !supportsTools);
+                
+        const tools = toolsAllowed
+          ? {
+              ...(webSearchEnabled && { webSearch, getWeather }),
+              ...(persist && {
+                createDocument: createDocument({ dataStream, modelId: chatModel, session }),
+                editDocument: editDocument({ dataStream, session }),
+                updateDocument: updateDocument({ dataStream, modelId: chatModel, session }),
+                requestSuggestions: requestSuggestions({ dataStream, modelId: chatModel, session }),
+              }),
+            }
+          : {};
 
         const result = streamText({
-          activeTools:
-            webSearchEnabled || (isReasoningModel && !supportsTools)
-              ? []
-              : persist
-                ? [
-                    "getWeather",
-                    "createDocument",
-                    "editDocument",
-                    "updateDocument",
-                    "requestSuggestions",
-                    "webSearch",
-                  ]
-                : ["getWeather", "webSearch"],
+
+          
           instructions: `${systemPrompt({ requestHints, supportsTools })}${webSearchEnabled || hasPdfAttachment ? "" : webSearchOffPrompt}${webSearchContext}`,
           messages: modelMessages,
           model: getLanguageModel(chatModel),
@@ -438,7 +438,6 @@ export async function POST(request: Request) {
         });
 
         /*-------LLM Chat response moderation-------------*/
-        console.log("\nModel message moderation");
         const responseText = await result.text;
         if (await isFlagged(responseText, session, id)) {
           throw new ChatbotError("forbidden:moderation");

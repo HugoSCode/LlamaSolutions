@@ -2,11 +2,12 @@ export const LIVE_INFO_NOTICE =
   "I can't access live data while Web search is off, so I won't guess. Turn on Web search with the globe button, then ask again for an up-to-date answer.";
 
 export const webSearchOffPrompt = `
-Web search is OFF for this turn. You cannot see the live web, news, prices, weather, or who holds an office today.
-If the question depends on information that can change — current officeholders, news, prices, weather, sports results, or anything about today, latest, or recent events — do NOT guess, estimate, or invent names, numbers, dates, or scores. Do not call search or weather tools for it.
-Reply with only this message:
+Web search is OFF for this turn. You must not rely on memory for facts about the real world.
+
+If the user asks for a specific fact about a person, event, result, date, statistic, price, news item, place, organisation, or anything else that would normally need to be looked up, do NOT answer it, even if you think you know. Reply only with:
 ${LIVE_INFO_NOTICE}
-Answer general knowledge, history, explanations, math, coding, and writing normally.`;
+
+You may answer without web search when the question is about: writing, editing, translating, coding, maths, explaining general concepts or how things work, the content of this conversation, or any attached document.`;
 
 const HISTORICAL_YEAR = /\b(?:1\d{3}|20[0-1]\d|202[0-3])\b/;
 
